@@ -51,6 +51,9 @@
             <button id="open-plot-editor-btn" class="btn btn-secondary" title="Customize Titles, Typography, Legend, Geometry &amp; High-DPI Export">
                 <i data-lucide="sliders"></i> <span>Plot Editor</span>
             </button>
+                        <button id="open-size-estimator-btn" class="btn btn-secondary" title="Analyze MW from Particle Size (nm) &amp; Column Transit Time (No Concentration Required)">
+                <i data-lucide="ruler"></i> <span>Size &amp; MW Estimator</span>
+            </button>
             <button id="export-chart-btn" class="btn btn-export" title="Export High-Resolution Publication Plot" disabled>
                 <i data-lucide="download"></i> <span>Export</span>
             </button>
@@ -59,6 +62,9 @@
                     <i data-lucide="help-circle"></i> <span>Guides</span> <i data-lucide="chevron-down" class="dropdown-chevron"></i>
                 </button>
                 <div class="dropdown-menu" id="guides-dropdown-menu">
+                                        <button class="dropdown-item" id="header-size-vs-conc-guide-btn" type="button">
+                        <i data-lucide="help-circle"></i> <span>Why MALS Needs Conc. vs Particle Size</span>
+                    </button>
                     <button class="dropdown-item" id="header-guide-modal-btn" type="button">
                         <i data-lucide="book-open"></i> <span>How SEC-MALS Works</span>
                     </button>
@@ -644,6 +650,9 @@
                     <button id="open-column-cal-modal-btn" class="btn btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.5rem; width:100%;">
                         <i data-lucide="sliders" style="width:13px; height:13px;"></i> Configure Standards &amp; Curves
                     </button>
+                    <button id="sidebar-open-size-estimator-btn" class="btn btn-primary" style="font-size:0.75rem; padding:0.4rem 0.5rem; width:100%; margin-top:0.35rem;">
+                        <i data-lucide="ruler" style="width:13px; height:13px;"></i> Multi-Model Size &amp; MW Calculator
+                    </button>
                 </div>
             </div>
         </aside>
@@ -738,7 +747,8 @@
                                     <th>Height</th>
                                     <th>AUC</th>
                                     <th>Mw MALS (kDa)</th>
-                                    <th id="th-sec-mw" title="Apparent Molecular Weight calculated from SEC Column Calibration Curve">SEC Apparent (kDa)</th>
+                                                                        <th id="th-sec-mw" title="Apparent Molecular Weight calculated from SEC Column Calibration Curve">SEC Apparent (kDa)</th>
+                                    <th id="th-est-diam" title="Estimated Hydrodynamic Stokes Diameter and Radius (nm) derived from elution and Stokes-Einstein kinetics">Est. Diameter / Rh (nm)</th>
                                     <th id="th-sec-ratio" title="Apparent SEC Mw divided by MALS Absolute Mw (Conformation / Dispersity Indicator)">Conformation (App/MALS)</th>
                                     <th>Mn (kDa)</th>
                                     <th>PDI (Mw/Mn)</th>
@@ -1285,6 +1295,7 @@
 
             <!-- Biophysical Tabs -->
             <div class="modal-tabs">
+                                <button class="modal-tab-btn" data-tab="guide-tab-size-vs-conc"><i data-lucide="help-circle"></i> Size (nm) vs MALS Conc.</button>
                 <button class="modal-tab-btn active" data-tab="guide-tab-sec-vs-mals"><i data-lucide="layers"></i> SEC vs MALS vs SDS-PAGE</button>
                 <button class="modal-tab-btn" data-tab="guide-tab-dndc"><i data-lucide="droplet"></i> dn/dc Increment</button>
                 <button class="modal-tab-btn" data-tab="guide-tab-fit"><i data-lucide="trending-up"></i> Angular Fit Models</button>
@@ -1294,7 +1305,44 @@
             </div>
 
             <div class="modal-body" style="padding-top: 1rem; font-size: 0.875rem; line-height: 1.6; color: var(--text-secondary);">
-                <!-- Tab: SEC vs MALS vs SDS-PAGE (Prominent Diagnostic Reference) -->
+                                <!-- Tab: Size vs MALS Concentration -->
+                <div class="modal-tab-content" id="guide-tab-size-vs-conc">
+                    <div style="background:var(--bg-primary); padding:1rem; border-radius:var(--radius-md); border-left:4px solid var(--accent); border:1px solid var(--border-color); margin-bottom:0.75rem;">
+                        <strong style="color:var(--accent); font-size:1rem;">Why MALS Needs Concentration for MW, But Can Still Measure Size (nm)</strong>
+                        <p style="margin-top:0.35rem;">
+                            Understanding why Astra or Wyatt software halts with <em>"Cannot calculate Molecular Weight without concentration"</em> while still reporting particle diameters and Stokes radii in nanometers.
+                        </p>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                        <div style="background:var(--bg-primary); padding:0.85rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:#0288d1; font-size:0.9rem;"><i data-lucide="activity" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> 1. The Fundamental Rayleigh Ratio Equation for Mass</strong>
+                            <p style="font-size:0.8rem; margin-top:0.25rem;">
+                                In Multi-Angle Light Scattering (MALS), the absolute excess scattered light at zero angle is given by:
+                            </p>
+                            <div style="background:var(--bg-card); padding:0.5rem; margin:0.4rem 0; font-family:var(--font-mono); font-size:0.85rem; text-align:center;">
+                                R(0) = K* &middot; c &middot; Mw
+                            </div>
+                            <p style="font-size:0.8rem;">
+                                Solving for molar mass gives <strong>Mw = R(0) / (K* &middot; c)</strong>. Because the scattered intensity is directly proportional to both <em>concentration (c)</em> and <em>mass (Mw)</em>, without knowing the concentration (from UV extinction &epsilon; or differential refractive index dn/dc), the equation cannot be solved for Mw!
+                            </p>
+                        </div>
+
+                        <div style="background:var(--bg-primary); padding:0.85rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:#2e7d32; font-size:0.9rem;"><i data-lucide="ruler" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> 2. Why Particle Size (nm) Does NOT Need Concentration</strong>
+                            <p style="font-size:0.8rem; margin-top:0.25rem;">
+                                Unlike molar mass, <strong>spatial dimensions</strong> are measured purely by angular phase differences and Brownian diffusion:
+                            </p>
+                            <ul style="font-size:0.8rem; padding-left:1.25rem; margin-top:0.3rem; display:flex; flex-direction:column; gap:0.3rem;">
+                                <li><strong>Radius of Gyration (Rg):</strong> Determined from the <em>angular slope</em> of light scattering across detectors: R(&theta;)/R(0) &approx; 1 - (16&pi;&sup2; n&sup2;/3&lambda;&sup2;) Rg&sup2; sin&sup2;(&theta;/2). The concentration <em>c</em> cancels out completely!</li>
+                                <li><strong>Hydrodynamic Radius (Rh) by DLS:</strong> Determined from the fluctuation decay rate &Gamma; = D &middot; q&sup2;, which gives diffusion coefficient D. By the Stokes-Einstein equation Rh = kBT / (6&pi;&eta;D), requiring <em>zero concentration information</em>.</li>
+                                <li><strong>SEC Column Elution Volume:</strong> Molecules elute strictly according to their hydrodynamic volume (Stokes radius Rh) partitioning into pore volume (Kav). Concentration is not required to estimate size or column-apparent mass.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: SEC vs MALS vs SDS-PAGE -->
                 <div class="modal-tab-content active" id="guide-tab-sec-vs-mals">
                     <div style="background:var(--bg-primary); padding:1rem; border-radius:var(--radius-md); border-left:4px solid #6366f1; border:1px solid var(--border-color); margin-bottom:0.75rem;">
                         <strong style="color:#6366f1; font-size:1rem;">Biophysical Diagnostic Reference: SEC vs. MALS vs. SDS-PAGE &amp; Aggregation</strong>
@@ -1613,6 +1661,120 @@
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
                 <button id="cancel-column-cal-btn" class="btn btn-secondary">Cancel</button>
                 <button id="apply-column-cal-btn" class="btn btn-primary"><i data-lucide="check-circle"></i> Apply Calibration</button>
+            </div>
+        </div>
+    </div>
+
+        <!-- Particle Size & Hydrodynamic MW Estimator Modal (No Concentration Required) -->
+    <div id="size-estimator-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 820px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="ruler" style="color:#ffffff;"></i> Particle Size &amp; Column MW Estimator (No Concentration Required)</h3>
+                <button id="close-size-estimator-modal" class="btn-table-action" style="cursor: pointer;"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1rem; margin-top: 0.5rem;">
+                <!-- Scientific rationale banner -->
+                <div style="background: var(--bg-primary); border-left: 4px solid var(--accent); padding: 0.85rem 1rem; border-radius: var(--radius-sm); font-size: 0.78rem; line-height: 1.5;">
+                    <strong><i data-lucide="info" style="width:14px; height:14px; vertical-align:middle; color:var(--accent);"></i> Why did Astra say "Cannot calculate MW without concentration"?</strong>
+                    <div style="margin-top: 0.35rem; color: var(--text-secondary);">
+                        Absolute Molar Mass by MALS is calculated from excess Rayleigh scattering: <strong>Mw = R(0) / (K* &middot; c)</strong>. Without specifying sample concentration <strong>c</strong> (or dRI <strong>dn/dc</strong>), MALS cannot separate mass from concentration.
+                        <strong>However</strong>, light scattering angular slopes (Rg), DLS decay rates (Rh), and SEC column travel times all measure <strong>particle size (nm) with ZERO concentration required</strong>! Use this tool to derive approximate Molecular Weights directly from column retention time or particle diameter.
+                    </div>
+                </div>
+
+                <!-- Input Controls -->
+                <div style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 1rem; border-radius: var(--radius-md);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <span style="font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-primary);">1. Choose Column &amp; Measurement Input</span>
+                        <button id="size-estimator-fill-peak-btn" class="btn btn-secondary" style="font-size:0.72rem; padding:0.25rem 0.5rem;">
+                            <i data-lucide="crosshair" style="width:13px; height:13px;"></i> Grab Active Peak Apex
+                        </button>
+                    </div>
+
+                    <div class="form-row" style="grid-template-columns: 2fr 1fr 1fr; margin-bottom: 0.85rem;">
+                        <div class="form-group">
+                            <label for="size-estimator-col-preset">Chromatography Column</label>
+                            <select id="size-estimator-col-preset" class="input-control">
+                                <option value="superdex200" selected>Cytiva Superdex 200 Increase 10/300 GL (10 - 600 kDa, Vt=24 mL)</option>
+                                <option value="superose6">Cytiva Superose 6 Increase 10/300 GL (5 - 5000 kDa, Vt=24 mL)</option>
+                                <option value="superdex75">Cytiva Superdex 75 Increase 10/300 GL (3 - 70 kDa, Vt=24 mL)</option>
+                                <option value="tsk4000">Tosoh TSKgel G4000SWxl (20 - 7000 kDa, Vt=14.3 mL)</option>
+                                <option value="tsk6000">Tosoh TSKgel G6000PWxl (40 - 8000+ kDa, Vt=14.3 mL)</option>
+                                <option value="custom">Custom Column Calibration</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="size-estimator-flowrate">Flow Rate (mL/min)</label>
+                            <input type="number" id="size-estimator-flowrate" class="input-control" value="0.50" step="0.05" min="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label for="size-estimator-input-mode">Primary Input Type</label>
+                            <select id="size-estimator-input-mode" class="input-control">
+                                <option value="vol" selected>Elution Volume (mL)</option>
+                                <option value="time">Retention Time (min)</option>
+                                <option value="diam">Particle Diameter (nm)</option>
+                                <option value="rh">Stokes Radius Rh (nm)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+                        <div class="form-group">
+                            <label id="lbl-size-estimator-val" for="size-estimator-input-val">Elution Volume (mL)</label>
+                            <input type="number" id="size-estimator-input-val" class="input-control" value="13.50" step="0.05" min="0.1">
+                        </div>
+                        <div class="form-group" style="justify-content: flex-end;">
+                            <button id="size-estimator-calc-btn" class="btn btn-primary" style="height: 34px; width: 100%;">
+                                <i data-lucide="calculator"></i> Calculate Multi-Model MW &amp; Size
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Multi-Model Prediction Results Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.85rem;">
+                    <!-- Result Card 1: Column Calibration MW -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-top: 3px solid var(--accent); padding: 0.85rem; border-radius: var(--radius-sm);">
+                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">A. Column Apparent MW</div>
+                        <div id="res-col-mw" style="font-size: 1.4rem; font-weight: 700; font-family: var(--font-mono); color: var(--accent); margin: 0.35rem 0;">— kDa</div>
+                        <div style="font-size: 0.72rem; color: var(--text-secondary);">Direct retention volume fit based on column calibration curve.</div>
+                    </div>
+
+                    <!-- Result Card 2: Globular Protein Size MW -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-top: 3px solid #2e7d32; padding: 0.85rem; border-radius: var(--radius-sm);">
+                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">B. Globular Protein Model</div>
+                        <div id="res-glob-mw" style="font-size: 1.4rem; font-weight: 700; font-family: var(--font-mono); color: #2e7d32; margin: 0.35rem 0;">— kDa</div>
+                        <div style="font-size: 0.72rem; color: var(--text-secondary);">Hydrated compact spherical protein: Rh &approx; 0.066 &middot; M^0.37.</div>
+                    </div>
+
+                    <!-- Result Card 3: Disordered Protein Model -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-top: 3px solid #ef6c00; padding: 0.85rem; border-radius: var(--radius-sm);">
+                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">C. Disordered / Extended Model</div>
+                        <div id="res-dis-mw" style="font-size: 1.4rem; font-weight: 700; font-family: var(--font-mono); color: #ef6c00; margin: 0.35rem 0;">— kDa</div>
+                        <div style="font-size: 0.72rem; color: var(--text-secondary);">Intrinsically disordered / denatured coil: Rh &approx; 0.228 &middot; M^0.50.</div>
+                    </div>
+
+                    <!-- Result Card 4: Particle Dimensions -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-top: 3px solid #00838f; padding: 0.85rem; border-radius: var(--radius-sm);">
+                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">D. Particle Size &amp; Radius</div>
+                        <div id="res-particle-size" style="font-size: 1.3rem; font-weight: 700; font-family: var(--font-mono); color: #00838f; margin: 0.35rem 0;">— nm</div>
+                        <div id="res-particle-sub" style="font-size: 0.72rem; color: var(--text-secondary);">Stokes Radius (Rh) &amp; Diameter (2Rh).</div>
+                    </div>
+                </div>
+
+                <!-- Column Kinetics & Partition Diagnostics -->
+                <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 0.85rem 1rem; border-radius: var(--radius-sm); font-size: 0.78rem; display: flex; flex-direction: column; gap: 0.4rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 700; color: var(--text-primary);"><i data-lucide="compass" style="width:14px; height:14px; vertical-align:middle;"></i> Partition Coefficient (Kav):</span>
+                        <span id="res-kav-badge" class="badge-peak" style="font-family: var(--font-mono); font-weight: 700;">—</span>
+                    </div>
+                    <div id="res-kav-explanation" style="color: var(--text-secondary); line-height: 1.4;">
+                        Select a column and enter an elution volume or diameter to see fractionation metrics.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close-size-estimator-btn" class="btn btn-secondary">Close</button>
             </div>
         </div>
     </div>

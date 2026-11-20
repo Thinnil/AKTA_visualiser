@@ -71,6 +71,12 @@ const COLUMN_CALIBRATION_PRESETS = {
         name: 'Cytiva Superdex 200 Increase 10/300 GL (10 - 600 kDa)',
         flowRate: 0.5,
         unit: 'ml',
+        v0: 8.0,
+        vt: 24.0,
+        minMw: 10,
+        maxMw: 600,
+        rhMin: 1.5,
+        rhMax: 10.0,
         points: [
             { active: true, name: 'Thyroglobulin', mw: 669, volume: 8.65 },
             { active: true, name: 'Ferritin', mw: 440, volume: 10.40 },
@@ -86,6 +92,12 @@ const COLUMN_CALIBRATION_PRESETS = {
         name: 'Cytiva Superose 6 Increase 10/300 GL (5 - 5000 kDa)',
         flowRate: 0.5,
         unit: 'ml',
+        v0: 7.2,
+        vt: 24.0,
+        minMw: 5,
+        maxMw: 5000,
+        rhMin: 1.0,
+        rhMax: 20.0,
         points: [
             { active: true, name: 'Thyroglobulin', mw: 669, volume: 12.20 },
             { active: true, name: 'Ferritin', mw: 440, volume: 14.10 },
@@ -98,6 +110,12 @@ const COLUMN_CALIBRATION_PRESETS = {
         name: 'Cytiva Superdex 75 Increase 10/300 GL (3 - 70 kDa)',
         flowRate: 0.5,
         unit: 'ml',
+        v0: 8.5,
+        vt: 24.0,
+        minMw: 3,
+        maxMw: 70,
+        rhMin: 0.8,
+        rhMax: 4.5,
         points: [
             { active: true, name: 'Conalbumin', mw: 75, volume: 8.70 },
             { active: true, name: 'Ovalbumin', mw: 44, volume: 9.90 },
@@ -110,6 +128,12 @@ const COLUMN_CALIBRATION_PRESETS = {
         name: 'Tosoh TSKgel G4000SWxl (20 - 7000 kDa)',
         flowRate: 0.5,
         unit: 'ml',
+        v0: 5.5,
+        vt: 14.3,
+        minMw: 20,
+        maxMw: 7000,
+        rhMin: 2.0,
+        rhMax: 25.0,
         points: [
             { active: true, name: 'Thyroglobulin', mw: 669, volume: 6.80 },
             { active: true, name: 'IgG', mw: 150, volume: 8.25 },
@@ -122,6 +146,12 @@ const COLUMN_CALIBRATION_PRESETS = {
         name: 'Tosoh TSKgel G6000PWxl (40 - 8000+ kDa)',
         flowRate: 0.5,
         unit: 'ml',
+        v0: 5.5,
+        vt: 14.3,
+        minMw: 40,
+        maxMw: 10000,
+        rhMin: 3.0,
+        rhMax: 40.0,
         points: [
             { active: true, name: 'Dextran 5MDa', mw: 5000, volume: 5.60 },
             { active: true, name: 'Dextran 2MDa', mw: 2000, volume: 6.20 },
@@ -134,10 +164,15 @@ const COLUMN_CALIBRATION_PRESETS = {
         name: 'Custom Standards (User Input)',
         flowRate: 0.5,
         unit: 'ml',
+        v0: 8.0,
+        vt: 24.0,
+        minMw: 10,
+        maxMw: 1000,
+        rhMin: 1.0,
+        rhMax: 15.0,
         points: [
-            { active: true, name: 'Standard 1', mw: 669, volume: 8.5 },
-            { active: true, name: 'Standard 2 (e.g. 70 kDa at 13 min)', mw: 70, volume: 13.0 },
-            { active: true, name: 'Standard 3', mw: 29, volume: 16.0 }
+            { active: true, name: 'Protein 1 (60 kDa)', mw: 60, volume: 10.0 },
+            { active: true, name: 'Protein 2 (10 kDa)', mw: 10, volume: 15.0 }
         ]
     }
 };
@@ -200,14 +235,111 @@ function fitColumnCalibration() {
     columnCalibrationState.r2 = r2;
 }
 
-function predictApparentSecMw(elutionMl) {
-    if (!columnCalibrationState.enabled || columnCalibrationState.m === null || columnCalibrationState.b === null || !elutionMl) {
-        return null;
+function fitStandardPoints(points, flowRate = 0.5, unit = 'ml') {
+    const pts = (points || []).filter(p => p.active && p.mw > 0 && p.volume > 0);
+    if (pts.length < 2) return { m: null, b: null, r2: null };
+    const isMin = unit === 'min';
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+        const p = pts[i];
+        const x = isMin ? (p.volume * flowRate) : p.volume;
+        const y = Math.log10(p.mw);
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumX2 += x * x;
+        sumY2 += y * y;
     }
-    const logMw = columnCalibrationState.m * elutionMl + columnCalibrationState.b;
-    if (isNaN(logMw) || logMw < -1 || logMw > 7) return null;
-    const mwKda = Math.pow(10, logMw);
-    return (!isNaN(mwKda) && isFinite(mwKda) && mwKda > 0) ? mwKda : null;
+    const denom = (n * sumX2 - sumX * sumX);
+    if (Math.abs(denom) < 1e-12) return { m: null, b: null, r2: null };
+    const slope = (n * sumXY - sumX * sumY) / denom;
+    const intercept = (sumY - slope * sumX) / n;
+    const numR = (n * sumXY - sumX * sumY);
+    const denR = Math.sqrt(Math.max(0, (n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY)));
+    const r2 = denR > 0 ? Math.pow(numR / denR, 2) : 0;
+    return { m: slope, b: intercept, r2: r2 };
+}
+
+function rhToMolecularWeightGlobular(rhNm) {
+    if (!rhNm || rhNm <= 0 || isNaN(rhNm)) return null;
+    // Wilkins/Uversky scaling law for folded globular proteins: Rh ≈ 0.066 * M^0.37 (nm)
+    // M (Da) = (Rh / 0.066)^(1 / 0.37) = (Rh / 0.066)^2.7027
+    const mwDa = Math.pow(rhNm / 0.066, 2.7027);
+    return mwDa / 1000.0; // return in kDa
+}
+
+function rhToMolecularWeightDisordered(rhNm) {
+    if (!rhNm || rhNm <= 0 || isNaN(rhNm)) return null;
+    // Scaling law for intrinsically disordered / denatured proteins: Rh ≈ 0.228 * M^0.498 (nm)
+    // M (Da) = (Rh / 0.228)^(1 / 0.498) = (Rh / 0.228)^2.008
+    const mwDa = Math.pow(rhNm / 0.228, 2.008);
+    return mwDa / 1000.0; // return in kDa
+}
+
+function calculateKav(elutionMl, presetKey = 'superdex200') {
+    const col = COLUMN_CALIBRATION_PRESETS[presetKey] || COLUMN_CALIBRATION_PRESETS.superdex200;
+    const v0 = col.v0 || 8.0;
+    const vt = col.vt || 24.0;
+    if (vt <= v0) return 0;
+    return (elutionMl - v0) / (vt - v0);
+}
+
+function elutionToHydrodynamicRadius(elutionMl, presetKey = 'superdex200') {
+    if (!elutionMl || isNaN(elutionMl) || elutionMl <= 0) return null;
+    const col = COLUMN_CALIBRATION_PRESETS[presetKey] || COLUMN_CALIBRATION_PRESETS.superdex200;
+    
+    // First calculate apparent MW
+    let mwKda = null;
+    if (columnCalibrationState.enabled && columnCalibrationState.m !== null && columnCalibrationState.preset === presetKey) {
+        mwKda = predictApparentSecMw(elutionMl);
+    } else {
+        const fit = fitStandardPoints(col.points, col.flowRate || 0.5, col.unit || 'ml');
+        if (fit && fit.m !== null) {
+            const logMw = fit.m * elutionMl + fit.b;
+            if (!isNaN(logMw) && logMw >= -1 && logMw <= 7) mwKda = Math.pow(10, logMw);
+        }
+    }
+
+    if (mwKda && mwKda > 0) {
+        const rhNm = 0.066 * Math.pow(mwKda * 1000.0, 0.37);
+        return {
+            rhNm: Math.round(rhNm * 100) / 100,
+            diamNm: Math.round(rhNm * 200) / 100,
+            mwKda: Math.round(mwKda * 10) / 10
+        };
+    }
+
+    const kav = calculateKav(elutionMl, presetKey);
+    const clampedKav = Math.max(0.001, Math.min(0.999, kav));
+    const scaleA = col.rhMax ? (col.rhMax * 0.45) : 3.5;
+    const rhNm = scaleA * Math.sqrt(-Math.log(clampedKav));
+    return {
+        rhNm: Math.round(rhNm * 100) / 100,
+        diamNm: Math.round(rhNm * 200) / 100,
+        mwKda: null
+    };
+}
+
+function predictApparentSecMw(elutionMl) {
+    if (!elutionMl || isNaN(elutionMl) || elutionMl <= 0) return null;
+    if (columnCalibrationState.enabled && columnCalibrationState.m !== null && columnCalibrationState.b !== null) {
+        const logMw = columnCalibrationState.m * elutionMl + columnCalibrationState.b;
+        if (isNaN(logMw) || logMw < -1 || logMw > 7) return null;
+        const mwKda = Math.pow(10, logMw);
+        return (!isNaN(mwKda) && isFinite(mwKda) && mwKda > 0) ? mwKda : null;
+    }
+    // Default fallback: automatically fit from active preset so user always gets helpful MW predictions
+    const activePreset = COLUMN_CALIBRATION_PRESETS[columnCalibrationState.preset] || COLUMN_CALIBRATION_PRESETS.superdex200;
+    const defaultFit = fitStandardPoints(activePreset.points, activePreset.flowRate, activePreset.unit);
+    if (defaultFit && defaultFit.m !== null) {
+        const logMw = defaultFit.m * elutionMl + defaultFit.b;
+        if (!isNaN(logMw) && logMw >= -1 && logMw <= 7) {
+            const mwKda = Math.pow(10, logMw);
+            return (!isNaN(mwKda) && isFinite(mwKda) && mwKda > 0) ? mwKda : null;
+        }
+    }
+    return null;
 }
 
 function syncColumnCalibrationUI() {
@@ -3387,16 +3519,88 @@ function updatePeaksTable() {
         const tdAuc = document.createElement('td');
         tdAuc.textContent = pk.auc.toFixed(2);
         
+        const secMw = predictApparentSecMw(pk.apex);
+        pk.secApparentMw = secMw;
+        const sizeInfo = elutionToHydrodynamicRadius(pk.apex, columnCalibrationState.preset);
+        pk.estimatedRh = sizeInfo ? sizeInfo.rhNm : null;
+        pk.estimatedDiam = sizeInfo ? sizeInfo.diamNm : null;
+        pk.globularMw = sizeInfo ? rhToMolecularWeightGlobular(sizeInfo.rhNm) : null;
+        pk.disorderedMw = sizeInfo ? rhToMolecularWeightDisordered(sizeInfo.rhNm) : null;
+
         const tdMw = document.createElement('td');
         if (pk.mwKda !== null) {
             const mwSpan = document.createElement('span');
             mwSpan.className = 'badge-mw';
             mwSpan.textContent = `${pk.mwKda.toFixed(1)} kDa`;
             tdMw.appendChild(mwSpan);
+        } else if (secMw !== null || pk.globularMw !== null) {
+            const estVal = secMw !== null ? secMw : pk.globularMw;
+            const mwSpan = document.createElement('span');
+            mwSpan.className = 'badge-mw';
+            mwSpan.style.background = '#e3f2fd';
+            mwSpan.style.color = '#1565c0';
+            mwSpan.style.border = '1px solid #90caf9';
+            mwSpan.title = 'Estimated from SEC Column & Stokes Size (MALS concentration was not specified)';
+            mwSpan.innerHTML = `~${estVal.toFixed(1)} kDa <small style="display:block; font-size:0.68rem; font-weight:normal; color:#546e7a;">[Est. by Size]</small>`;
+            tdMw.appendChild(mwSpan);
         } else {
             tdMw.textContent = '—';
         }
         
+        const tdSecMw = document.createElement('td');
+        if (secMw !== null) {
+            const spanSec = document.createElement('span');
+            spanSec.className = 'badge-mw';
+            spanSec.style.background = '#e8f5e9';
+            spanSec.style.color = '#2e7d32';
+            spanSec.style.border = '1px solid #a5d6a7';
+            spanSec.textContent = `${secMw.toFixed(1)} kDa`;
+            tdSecMw.appendChild(spanSec);
+        } else {
+            tdSecMw.textContent = '—';
+        }
+
+        const tdDiam = document.createElement('td');
+        if (pk.estimatedDiam !== null) {
+            const spanDiam = document.createElement('span');
+            spanDiam.style.fontFamily = 'var(--font-mono)';
+            spanDiam.style.fontSize = '0.78rem';
+            spanDiam.innerHTML = `<strong>${pk.estimatedDiam.toFixed(2)} nm</strong> <small style="color:var(--text-muted);">(Rh: ${pk.estimatedRh.toFixed(2)} nm)</small>`;
+            tdDiam.appendChild(spanDiam);
+        } else {
+            tdDiam.textContent = '—';
+        }
+
+        const tdConformation = document.createElement('td');
+        if (secMw !== null && pk.mwKda !== null && pk.mwKda > 0) {
+            const ratio = secMw / pk.mwKda;
+            pk.shapeRatio = ratio;
+            const badgeConf = document.createElement('span');
+            badgeConf.className = 'badge-peak';
+            if (ratio >= 0.85 && ratio <= 1.15) {
+                badgeConf.style.borderLeftColor = 'var(--success)';
+                badgeConf.style.color = 'var(--success)';
+                badgeConf.textContent = `Globular (${ratio.toFixed(2)}x)`;
+            } else if (ratio > 1.15) {
+                badgeConf.style.borderLeftColor = '#a78bfa';
+                badgeConf.style.color = '#a78bfa';
+                badgeConf.textContent = `Elongated (${ratio.toFixed(2)}x)`;
+            } else {
+                badgeConf.style.borderLeftColor = '#fbbf24';
+                badgeConf.style.color = '#fbbf24';
+                badgeConf.textContent = `Retarded (${ratio.toFixed(2)}x)`;
+            }
+            tdConformation.appendChild(badgeConf);
+        } else if (pk.globularMw !== null && pk.disorderedMw !== null) {
+            const badgeConf = document.createElement('span');
+            badgeConf.className = 'badge-peak';
+            badgeConf.style.fontSize = '0.7rem';
+            badgeConf.textContent = `Glob: ${pk.globularMw.toFixed(0)}k | Dis: ${pk.disorderedMw.toFixed(0)}k`;
+            tdConformation.appendChild(badgeConf);
+        } else {
+            tdConformation.textContent = '—';
+        }
+
         const tdMn = document.createElement('td');
         tdMn.textContent = pk.mnKda !== null ? `${pk.mnKda.toFixed(1)} kDa` : '—';
         
@@ -3427,44 +3631,6 @@ function updatePeaksTable() {
         } else {
             tdStoich.textContent = '—';
         }
-        
-        const tdSecMw = document.createElement('td');
-        const secMw = predictApparentSecMw(pk.apex);
-        pk.secApparentMw = secMw;
-        if (secMw !== null) {
-            const spanSec = document.createElement('span');
-            spanSec.className = 'badge-mw';
-            spanSec.style.background = 'rgba(56, 189, 248, 0.15)';
-            spanSec.style.color = '#38bdf8';
-            spanSec.textContent = `${secMw.toFixed(1)} kDa`;
-            tdSecMw.appendChild(spanSec);
-        } else {
-            tdSecMw.textContent = '—';
-        }
-
-        const tdConformation = document.createElement('td');
-        if (secMw !== null && pk.mwKda !== null && pk.mwKda > 0) {
-            const ratio = secMw / pk.mwKda;
-            pk.shapeRatio = ratio;
-            const badgeConf = document.createElement('span');
-            badgeConf.className = 'badge-peak';
-            if (ratio >= 0.85 && ratio <= 1.15) {
-                badgeConf.style.borderLeftColor = 'var(--success)';
-                badgeConf.style.color = 'var(--success)';
-                badgeConf.textContent = `Globular (${ratio.toFixed(2)}x)`;
-            } else if (ratio > 1.15) {
-                badgeConf.style.borderLeftColor = '#a78bfa';
-                badgeConf.style.color = '#a78bfa';
-                badgeConf.textContent = `Elongated (${ratio.toFixed(2)}x)`;
-            } else {
-                badgeConf.style.borderLeftColor = '#fbbf24';
-                badgeConf.style.color = '#fbbf24';
-                badgeConf.textContent = `Retarded (${ratio.toFixed(2)}x)`;
-            }
-            tdConformation.appendChild(badgeConf);
-        } else {
-            tdConformation.textContent = '—';
-        }
 
         const tdAction = document.createElement('td');
         tdAction.style.textAlign = 'center';
@@ -3482,6 +3648,7 @@ function updatePeaksTable() {
         tr.appendChild(tdAuc);
         tr.appendChild(tdMw);
         tr.appendChild(tdSecMw);
+        tr.appendChild(tdDiam);
         tr.appendChild(tdConformation);
         tr.appendChild(tdMn);
         tr.appendChild(tdPdi);
@@ -6260,3 +6427,179 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Failed to render Lucide icons:', err);
     }
 });
+
+
+    // ==========================================================================
+    // Size & MW Multi-Model Estimator Interactive Handlers
+    // ==========================================================================
+    const sizeEstimatorModal = document.getElementById('size-estimator-modal');
+    const openSizeEstimatorBtn = document.getElementById('open-size-estimator-btn');
+    const sidebarOpenSizeEstimatorBtn = document.getElementById('sidebar-open-size-estimator-btn');
+    const closeSizeEstimatorModal = document.getElementById('close-size-estimator-modal');
+    const closeSizeEstimatorBtn = document.getElementById('close-size-estimator-btn');
+    const sizeEstimatorFillPeakBtn = document.getElementById('size-estimator-fill-peak-btn');
+    const sizeEstimatorCalcBtn = document.getElementById('size-estimator-calc-btn');
+    const sizeEstimatorColPreset = document.getElementById('size-estimator-col-preset');
+    const sizeEstimatorFlowRate = document.getElementById('size-estimator-flowrate');
+    const sizeEstimatorInputMode = document.getElementById('size-estimator-input-mode');
+    const sizeEstimatorInputVal = document.getElementById('size-estimator-input-val');
+    const lblSizeEstimatorVal = document.getElementById('lbl-size-estimator-val');
+    const headerSizeVsConcGuideBtn = document.getElementById('header-size-vs-conc-guide-btn');
+
+    function calculateSizeEstimator() {
+        if (!sizeEstimatorInputVal) return;
+        const mode = sizeEstimatorInputMode ? sizeEstimatorInputMode.value : 'vol';
+        const presetKey = sizeEstimatorColPreset ? sizeEstimatorColPreset.value : 'superdex200';
+        const fr = (sizeEstimatorFlowRate && parseFloat(sizeEstimatorFlowRate.value) > 0) ? parseFloat(sizeEstimatorFlowRate.value) : 0.5;
+        const val = parseFloat(sizeEstimatorInputVal.value) || 0;
+        const col = COLUMN_CALIBRATION_PRESETS[presetKey] || COLUMN_CALIBRATION_PRESETS.superdex200;
+
+        let volMl = 0;
+        let rhNm = 0;
+        let diamNm = 0;
+
+        if (mode === 'vol') {
+            volMl = val;
+            const sz = elutionToHydrodynamicRadius(volMl, presetKey);
+            rhNm = sz ? sz.rhNm : 0;
+            diamNm = sz ? sz.diamNm : 0;
+        } else if (mode === 'time') {
+            volMl = val * fr;
+            const sz = elutionToHydrodynamicRadius(volMl, presetKey);
+            rhNm = sz ? sz.rhNm : 0;
+            diamNm = sz ? sz.diamNm : 0;
+        } else if (mode === 'diam') {
+            diamNm = val;
+            rhNm = val / 2.0;
+            // Approximate elution volume from Rh
+            const globMw = rhToMolecularWeightGlobular(rhNm);
+            const fit = fitStandardPoints(col.points, fr, 'ml');
+            if (fit && fit.m !== null && globMw > 0) {
+                volMl = (Math.log10(globMw) - fit.b) / fit.m;
+            }
+        } else if (mode === 'rh') {
+            rhNm = val;
+            diamNm = val * 2.0;
+            const globMw = rhToMolecularWeightGlobular(rhNm);
+            const fit = fitStandardPoints(col.points, fr, 'ml');
+            if (fit && fit.m !== null && globMw > 0) {
+                volMl = (Math.log10(globMw) - fit.b) / fit.m;
+            }
+        }
+
+        // 1. Column apparent MW
+        let colMw = null;
+        if (volMl > 0) {
+            const fit = fitStandardPoints(col.points, fr, 'ml');
+            if (fit && fit.m !== null) {
+                const logMw = fit.m * volMl + fit.b;
+                if (!isNaN(logMw) && logMw >= -1 && logMw <= 7) colMw = Math.pow(10, logMw);
+            }
+        }
+
+        // 2. Globular MW
+        const globMw = rhToMolecularWeightGlobular(rhNm);
+
+        // 3. Disordered MW
+        const disMw = rhToMolecularWeightDisordered(rhNm);
+
+        // 4. Kav
+        const kav = volMl > 0 ? calculateKav(volMl, presetKey) : null;
+
+        // Update UI
+        const resColMw = document.getElementById('res-col-mw');
+        const resGlobMw = document.getElementById('res-glob-mw');
+        const resDisMw = document.getElementById('res-dis-mw');
+        const resParticleSize = document.getElementById('res-particle-size');
+        const resParticleSub = document.getElementById('res-particle-sub');
+        const resKavBadge = document.getElementById('res-kav-badge');
+        const resKavExplanation = document.getElementById('res-kav-explanation');
+
+        if (resColMw) resColMw.textContent = colMw ? `${colMw.toFixed(1)} kDa` : 'Out of Range';
+        if (resGlobMw) resGlobMw.textContent = globMw ? `${globMw.toFixed(1)} kDa` : '—';
+        if (resDisMw) resDisMw.textContent = disMw ? `${disMw.toFixed(1)} kDa` : '—';
+        if (resParticleSize) resParticleSize.textContent = diamNm > 0 ? `${diamNm.toFixed(2)} nm` : '—';
+        if (resParticleSub) resParticleSub.textContent = rhNm > 0 ? `Stokes Radius Rh: ${rhNm.toFixed(2)} nm (Diam: ${diamNm.toFixed(2)} nm)` : '—';
+
+        if (resKavBadge && resKavExplanation) {
+            if (kav !== null && !isNaN(kav)) {
+                resKavBadge.textContent = `Kav = ${kav.toFixed(3)}`;
+                const v0 = col.v0 || 8.0;
+                const vt = col.vt || 24.0;
+                if (kav <= 0.05) {
+                    resKavBadge.style.color = 'var(--danger)';
+                    resKavExplanation.innerHTML = `<strong>Excluded (Void Volume):</strong> Elutes at ${volMl.toFixed(2)} mL (&le; V0 ${v0} mL). Molecule is larger than column exclusion limit (Aggregate / Giant complex > ${col.maxMw} kDa).`;
+                } else if (kav >= 0.95) {
+                    resKavBadge.style.color = 'var(--warning)';
+                    resKavExplanation.innerHTML = `<strong>Permeated (Total Bed Volume):</strong> Elutes at ${volMl.toFixed(2)} mL (&ge; Vt ${vt} mL). Molecule is small (&le; ${col.minMw} kDa) or delayed by non-specific column matrix interactions.`;
+                } else {
+                    resKavBadge.style.color = 'var(--success)';
+                    resKavExplanation.innerHTML = `<strong>Active Fractionation Window:</strong> Elutes at ${volMl.toFixed(2)} mL (Optimal separation zone between V0=${v0} mL and Vt=${vt} mL).`;
+                }
+            } else {
+                resKavBadge.textContent = '—';
+                resKavExplanation.textContent = 'Enter an elution volume or diameter to see fractionation kinetics.';
+            }
+        }
+    }
+
+    function openSizeEstimator() {
+        if (sizeEstimatorModal) sizeEstimatorModal.style.display = 'flex';
+        // If there are integrated peaks, prefill with first peak or apex
+        if (peaks.length > 0 && sizeEstimatorInputVal) {
+            sizeEstimatorInputVal.value = peaks[0].apex.toFixed(2);
+        }
+        calculateSizeEstimator();
+    }
+
+    if (openSizeEstimatorBtn) openSizeEstimatorBtn.addEventListener('click', openSizeEstimator);
+    if (sidebarOpenSizeEstimatorBtn) sidebarOpenSizeEstimatorBtn.addEventListener('click', openSizeEstimator);
+    if (closeSizeEstimatorModal) closeSizeEstimatorModal.addEventListener('click', () => { if (sizeEstimatorModal) sizeEstimatorModal.style.display = 'none'; });
+    if (closeSizeEstimatorBtn) closeSizeEstimatorBtn.addEventListener('click', () => { if (sizeEstimatorModal) sizeEstimatorModal.style.display = 'none'; });
+
+    if (sizeEstimatorInputMode) {
+        sizeEstimatorInputMode.addEventListener('change', () => {
+            const mode = sizeEstimatorInputMode.value;
+            if (lblSizeEstimatorVal) {
+                if (mode === 'vol') lblSizeEstimatorVal.textContent = 'Elution Volume (mL)';
+                else if (mode === 'time') lblSizeEstimatorVal.textContent = 'Retention Time (min)';
+                else if (mode === 'diam') lblSizeEstimatorVal.textContent = 'Particle Diameter (nm)';
+                else if (mode === 'rh') lblSizeEstimatorVal.textContent = 'Stokes Radius Rh (nm)';
+            }
+            calculateSizeEstimator();
+        });
+    }
+
+    if (sizeEstimatorCalcBtn) sizeEstimatorCalcBtn.addEventListener('click', calculateSizeEstimator);
+    if (sizeEstimatorInputVal) sizeEstimatorInputVal.addEventListener('input', calculateSizeEstimator);
+    if (sizeEstimatorColPreset) sizeEstimatorColPreset.addEventListener('change', calculateSizeEstimator);
+    if (sizeEstimatorFlowRate) sizeEstimatorFlowRate.addEventListener('input', calculateSizeEstimator);
+
+    if (sizeEstimatorFillPeakBtn) {
+        sizeEstimatorFillPeakBtn.addEventListener('click', () => {
+            if (peaks.length > 0) {
+                const pk = peaks[peaks.length - 1];
+                if (sizeEstimatorInputMode) sizeEstimatorInputMode.value = 'vol';
+                if (lblSizeEstimatorVal) lblSizeEstimatorVal.textContent = 'Elution Volume (mL)';
+                if (sizeEstimatorInputVal) sizeEstimatorInputVal.value = pk.apex.toFixed(2);
+                calculateSizeEstimator();
+                showToast(`Loaded ${pk.name} apex (${pk.apex.toFixed(2)} mL)`, "info");
+            } else {
+                showToast("No integrated peaks found. Click on a peak in the chart first!", "warning");
+            }
+        });
+    }
+
+    if (headerSizeVsConcGuideBtn) {
+        headerSizeVsConcGuideBtn.addEventListener('click', () => {
+            const bioModal = document.getElementById('biophysical-guide-modal');
+            if (bioModal) {
+                bioModal.style.display = 'flex';
+                // Switch to size vs conc tab
+                const tabs = bioModal.querySelectorAll('.modal-tab-btn');
+                const contents = bioModal.querySelectorAll('.modal-tab-content');
+                tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === 'guide-tab-size-vs-conc'));
+                contents.forEach(c => c.classList.toggle('active', c.id === 'guide-tab-size-vs-conc'));
+            }
+        });
+    }
