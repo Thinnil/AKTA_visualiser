@@ -1,0 +1,1678 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; worker-src 'self' blob: https://cdnjs.cloudflare.com;">
+    <title>Ã„KTA & Wyatt SEC-MALS Chromatogram & Stoichiometry Suite</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Chart.js and Zoom Plugin CDNs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- pako (GZIP/ZLIB decompression for Wyatt ASTRA .afe7 / .afs7 files) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- sql.js (WebAssembly SQLite for Wyatt ASTRA databases) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body data-theme="light">
+    <!-- App Header -->
+    <header>
+        <div class="logo-section">
+            <div class="logo-icon">
+                <i data-lucide="activity"></i>
+            </div>
+            <div class="logo-text">
+                <h1>Ã„KTA &amp; Wyatt SEC-MALS</h1>
+                <div class="header-subtitle">UNICORN &bull; ASTRA (.afe7/.afs7) &bull; MW &amp; Stoichiometry</div>
+            </div>
+        </div>
+
+        <!-- Compact 3-Window Segmented View Switcher -->
+        <nav class="view-switcher" id="main-view-switcher" aria-label="Main View Switcher">
+            <button class="view-tab-btn" data-view="baseline-studio" id="btn-view-baseline" title="Baseline Tare, Dark Current &amp; Calibration Studio">
+                <i data-lucide="microscope"></i> <span>1. Baseline</span>
+            </button>
+            <button class="view-tab-btn active" data-view="main-workspace" id="btn-view-main" title="Main Chromatogram Overlay &amp; Integration Workspace">
+                <i data-lucide="bar-chart-2"></i> <span>2. Workspace</span>
+            </button>
+            <button class="view-tab-btn" data-view="figure-editor" id="btn-view-editor" title="Split-Screen Live Publication Plot Editor">
+                <i data-lucide="palette"></i> <span>3. Figure Editor</span>
+            </button>
+        </nav>
+
+        <!-- High-Density Header Action Toolbar -->
+        <div class="header-controls">
+            <button id="auto-fit-mw-btn" class="btn btn-primary" title="1-Click Standardized Molecular Weight Analysis" disabled>
+                <i data-lucide="sparkles"></i> <span>Auto-Fit MW</span>
+            </button>
+            <button id="open-plot-editor-btn" class="btn btn-secondary" title="Customize Titles, Typography, Legend, Geometry &amp; High-DPI Export">
+                <i data-lucide="sliders"></i> <span>Plot Editor</span>
+            </button>
+            <button id="export-chart-btn" class="btn btn-export" title="Export High-Resolution Publication Plot" disabled>
+                <i data-lucide="download"></i> <span>Export</span>
+            </button>
+            <div class="dropdown" id="guides-dropdown">
+                <button id="guides-dropdown-btn" class="btn btn-secondary dropdown-toggle" title="Guides &amp; Scientific Documentation" type="button" aria-expanded="false">
+                    <i data-lucide="help-circle"></i> <span>Guides</span> <i data-lucide="chevron-down" class="dropdown-chevron"></i>
+                </button>
+                <div class="dropdown-menu" id="guides-dropdown-menu">
+                    <button class="dropdown-item" id="header-guide-modal-btn" type="button">
+                        <i data-lucide="book-open"></i> <span>How SEC-MALS Works</span>
+                    </button>
+                    <button class="dropdown-item" id="header-sec-vs-mals-guide-btn" type="button">
+                        <i data-lucide="layers"></i> <span>SEC vs MALS vs SDS-PAGE Guide</span>
+                    </button>
+                    <button class="dropdown-item" id="header-biophysical-guide-btn" type="button">
+                        <i data-lucide="microscope"></i> <span>Biophysical Guide</span>
+                    </button>
+                    <button class="dropdown-item" id="header-detectors-guide-btn" type="button">
+                        <i data-lucide="activity"></i> <span>Detectors &amp; Channels</span>
+                    </button>
+                </div>
+            </div>
+            <button id="theme-toggle" class="btn btn-secondary btn-icon" title="Switch to Dark Theme" type="button">
+                <i data-lucide="moon" id="theme-icon"></i>
+            </button>
+            <button id="reset-zoom" class="btn btn-secondary btn-icon" title="Reset Zoom" disabled>
+                <i data-lucide="maximize"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- App Views Wrapper -->
+    <div class="app-views-wrapper">
+
+        <!-- ================================================================= -->
+        <!-- VIEW 1: Baseline & MALS Studio -->
+        <!-- ================================================================= -->
+        <div id="view-baseline-studio" class="app-view" style="display:none;">
+            <div class="baseline-studio-layout">
+                <!-- Studio Sidebar Controls -->
+                <aside class="baseline-studio-sidebar">
+                    <div class="card-sidebar">
+                        <div class="card-title-badge-wrapper">
+                            <h4 class="section-title" style="margin-bottom:0;">
+                                <i data-lucide="sliders" style="color:var(--accent); width:14px; height:14px; vertical-align:middle;"></i> Solvent Baseline &amp; Tare Window
+                            </h4>
+                        </div>
+                        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.4rem;">
+                            Define the pure running buffer region (typically before the void volume, 0.5 - 2.5 mL).
+                        </p>
+
+                        <!-- Baseline Correction Plan Selector -->
+                        <div class="form-group" style="margin-bottom: 0.6rem;">
+                            <label for="studio-baseline-plan">Correction Plan</label>
+                            <select id="studio-baseline-plan" class="input-control">
+                                <option value="plan1" selected>Plan 1: Standard SEC Buffer Tare (Pre-Void Tare)</option>
+                                <option value="plan2">Plan 2: Linear Slope &amp; Lamp Drift (Pre-to-Post Peak Line)</option>
+                                <option value="plan3">Plan 3: Two-Point Averaged Tare (Pre &amp; Post Mean)</option>
+                            </select>
+                        </div>
+
+                        <!-- Baseline Start -->
+                        <div class="form-group">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <label for="studio-baseline-start">Base Start (mL)</label>
+                                <span id="studio-base-start-val" style="font-size:0.75rem; font-weight:700; color:var(--accent);">0.50 mL</span>
+                            </div>
+                            <input type="range" id="studio-baseline-start-slider" min="0" max="30" step="0.1" value="0.5" style="accent-color:var(--accent);">
+                            <input type="number" id="studio-baseline-start" class="input-control" value="0.5" step="0.1" min="0">
+                        </div>
+
+                        <!-- Baseline End -->
+                        <div class="form-group">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <label for="studio-baseline-end">Base End (mL)</label>
+                                <span id="studio-base-end-val" style="font-size:0.75rem; font-weight:700; color:var(--accent);">2.50 mL</span>
+                            </div>
+                            <input type="range" id="studio-baseline-end-slider" min="0" max="30" step="0.1" value="2.5" style="accent-color:var(--accent);">
+                            <input type="number" id="studio-baseline-end" class="input-control" value="2.5" step="0.1" min="0">
+                        </div>
+
+                        <!-- Post-Peak / Drift Inputs (Shown for Plan 2 & Plan 3) -->
+                        <div id="studio-post-peak-group" style="display:none; flex-direction:column; gap:0.5rem; margin-top:0.4rem; padding-top:0.5rem; border-top:1px dashed var(--border-color);">
+                            <div style="font-size:0.75rem; font-weight:600; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+                                <span>Post-Peak Window (mL)</span>
+                                <span id="studio-post-window-val" style="color:var(--accent); font-weight:700;">18.0 - 20.0 mL</span>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="studio-post-start">Post Start (mL)</label>
+                                    <input type="number" id="studio-post-start" class="input-control" value="18.0" step="0.5" min="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="studio-post-end">Post End (mL)</label>
+                                    <input type="number" id="studio-post-end" class="input-control" value="20.0" step="0.5" min="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                            <button id="studio-auto-baseline-btn" class="btn btn-secondary" style="flex:1; font-size:0.75rem; padding:0.4rem 0.5rem;" title="Auto-detect pre-void solvent region">
+                                <i data-lucide="target" style="width:13px; height:13px;"></i> Auto-Detect Tare
+                            </button>
+                            <button id="studio-apply-baseline-btn" class="btn btn-primary" style="flex:1.2; font-size:0.75rem; padding:0.4rem 0.5rem;" title="Apply tare &amp; recalculate all MALS channels">
+                                <i data-lucide="check-circle" style="width:13px; height:13px;"></i> Apply Baseline
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Peak Gating & Artifact Suppression Card -->
+                    <div class="card-sidebar">
+                        <div class="card-title-badge-wrapper">
+                            <h4 class="section-title" style="margin-bottom:0;">
+                                <i data-lucide="shield-check" style="color:#34d399; width:14px; height:14px; vertical-align:middle;"></i> Peak Gating &amp; MW Artifact Suppression
+                            </h4>
+                        </div>
+                        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.4rem;">
+                            Eliminates bogus pink molar mass points in empty baselines, buffer fronts, or column wash phases.
+                        </p>
+
+                        <div class="switch-control">
+                            <span style="font-weight:600; color:var(--text-primary);">Gate MW Across Peaks Only</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-mw-peak-gating" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <div id="gating-controls-group" style="display:flex; flex-direction:column; gap:0.6rem; margin-top:0.25rem;">
+                            <div class="form-group">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <label for="studio-conc-fraction-slider">Min Apex Conc Fraction (%)</label>
+                                    <span id="studio-conc-fraction-val" style="font-size:0.75rem; font-weight:700; color:#38bdf8;">1%</span>
+                                </div>
+                                <input type="range" id="studio-conc-fraction-slider" min="0.5" max="25" step="0.5" value="1" style="accent-color:#38bdf8;">
+                            </div>
+
+                            <div class="form-group">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <label for="studio-snr-slider">LS Signal-to-Noise Ratio (SNR)</label>
+                                    <span id="studio-snr-val" style="font-size:0.75rem; font-weight:700; color:#34d399;">3.0x</span>
+                                </div>
+                                <input type="range" id="studio-snr-slider" min="1.0" max="10.0" step="0.5" value="3.0" style="accent-color:#34d399;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 8-Angle Photodiode Dark Current Table -->
+                    <div class="card-sidebar">
+                        <h4 class="section-title" style="margin-bottom:0.3rem;">
+                            <i data-lucide="activity" style="color:#a78bfa; width:14px; height:14px; vertical-align:middle;"></i> 8-Angle Photodiode Calibration
+                        </h4>
+                        <div class="data-table-wrapper" style="max-height: 240px; overflow-y: auto;">
+                            <table class="data-table" id="studio-photodiodes-table" style="font-size:0.75rem;">
+                                <thead>
+                                    <tr>
+                                        <th>Angle</th>
+                                        <th>Detector</th>
+                                        <th>Base (V)</th>
+                                        <th>Norm Coeff</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="studio-photodiodes-tbody">
+                                    <tr>
+                                        <td colspan="4" style="text-align:center; color:var(--text-muted); padding:1rem;">Load a Wyatt MALS dataset to view photodiode baselines.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Studio Main Panel -->
+                <section class="baseline-studio-main">
+                    <!-- Baseline Subtracted Spectrum Chart Canvas -->
+                    <div class="chart-container-wrapper">
+                        <div class="chart-header">
+                            <div class="chart-title-group">
+                                <h3><i data-lucide="microscope" style="color:var(--accent); vertical-align:middle;"></i> Baseline &amp; Dark Current Calibration Spectrum</h3>
+                                <p id="studio-chart-subtitle">Shaded area represents the pure solvent tare window. Detector curves show baseline-subtracted excess Rayleigh voltages.</p>
+                            </div>
+                            <div class="chart-actions">
+                                <span class="badge-peak" id="studio-delta-mw-badge" style="border-left: 3px solid var(--success); background: var(--bg-primary); display: none;">
+                                    Î”Mw: 0.0 kDa (0.0%)
+                                </span>
+                                <span class="badge-peak" id="studio-tare-badge" style="border-left: 3px solid var(--accent); background: var(--bg-primary);">
+                                    Tare Window: 0.50 - 2.50 mL
+                                </span>
+                            </div>
+                        </div>
+                        <div class="chart-canvas-area" style="height: 380px;">
+                            <canvas id="baseline-preview-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Educational Guidance Cards Grid -->
+                    <div class="guidance-cards-grid">
+                        <div class="guidance-card">
+                            <div class="guidance-card-header">
+                                <div class="guidance-card-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                                    <i data-lucide="target"></i>
+                                </div>
+                                <h4>1. Where &amp; Why to Pick Baselines: Before Void vs After Elution</h4>
+                            </div>
+                            <p>
+                                The purest baseline is always the <strong>pre-injection or pre-void volume buffer flow</strong> (typically 0.5 â€“ 2.5 mL for a 24 mL column), where no sample or contaminants have reached the optical cells.
+                            </p>
+                            <div class="guidance-tip">
+                                <strong>Tip:</strong> Avoid post-elution baselines near the total column volume ($V_t$), which are frequently contaminated by buffer salt fronts, glycerol mismatch, or slow-leaching aggregates.
+                            </div>
+                        </div>
+
+                        <div class="guidance-card">
+                            <div class="guidance-card-header">
+                                <div class="guidance-card-icon" style="background: rgba(52, 211, 153, 0.15); color: #34d399;">
+                                    <i data-lucide="trending-up"></i>
+                                </div>
+                                <h4>2. Linear Slope &amp; Lamp Drift Correction</h4>
+                            </div>
+                            <p>
+                                Temperature fluctuations and gradual laser warm-up can cause slight baseline drift over a 60-minute SEC run. Linear baseline subtraction connects the start and end of the peak to subtract background drift without distorting peak area.
+                            </p>
+                            <div class="guidance-tip">
+                                <strong>Math:</strong> $y_{\text{corr}}(t) = y(t) - \left[y_0 + \frac{t - t_0}{t_1 - t_0}(y_1 - y_0)\right]$
+                            </div>
+                        </div>
+
+                        <div class="guidance-card">
+                            <div class="guidance-card-header">
+                                <div class="guidance-card-icon" style="background: rgba(232, 121, 249, 0.15); color: #e879f9;">
+                                    <i data-lucide="shield-alert"></i>
+                                </div>
+                                <h4>3. Peak-Gated MW Artifact Suppression</h4>
+                            </div>
+                            <p>
+                                SEC-MALS calculates $M_w(t) = \frac{R(0, t)}{K^* c(t)}$. When concentration $c(t) \to 0$ in empty baseline or column wash steps, dividing two near-zero noisy numbers causes mathematical divergence, creating millions of false pink MW dots!
+                            </p>
+                            <div class="guidance-tip">
+                                <strong>Solution:</strong> Peak gating limits MW plotting strictly to real protein peaks where $c(t) \ge 0.05 \times c_{\text{apex}}$ and $\text{SNR} \ge 3$.
+                            </div>
+                        </div>
+
+                        <div class="guidance-card">
+                            <div class="guidance-card-header">
+                                <div class="guidance-card-icon" style="background: rgba(167, 139, 250, 0.15); color: #a78bfa;">
+                                    <i data-lucide="activity"></i>
+                                </div>
+                                <h4>4. Dark Current &amp; 8-Angle Photodiode Alignment</h4>
+                            </div>
+                            <p>
+                                The Wyatt flow cell measures Rayleigh scattering at 8 distinct angles (32Â° to 141Â°). Each photodiode has a slight dark-current electronic offset that must be tared against pure solvent to ensure accurate angular extrapolation ($R(\theta \to 0)$).
+                            </p>
+                            <div class="guidance-tip">
+                                <strong>Standard:</strong> Detector 5 (90Â°) provides the highest signal-to-noise ratio for standard globular proteins ($R_g &lt; 10\text{ nm}$).
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- VIEW 2: Main Analysis Workspace (Active Default) -->
+        <!-- ================================================================= -->
+        <div id="view-main-workspace" class="app-view active">
+            <!-- Main Dashboard -->
+            <main class="dashboard">
+        <!-- Sidebar Controls -->
+        <aside class="sidebar">
+            <!-- Primary File Upload Card -->
+            <div>
+                <h4 class="section-title">Primary Chromatogram</h4>
+                <div class="upload-zone" id="drop-zone">
+                    <i data-lucide="file-spreadsheet" class="upload-icon" style="width: 32px; height: 32px; color: var(--accent);"></i>
+                    <p><strong>Load Ã„KTA CSV or Wyatt file</strong></p>
+                    <span>.csv, .afe7, .afs7 (Click or Drag & Drop)</span>
+                    <input type="file" id="csv-file-input" class="file-input" accept=".csv,.afe7,.afs7,.txt">
+                </div>
+            </div>
+
+            <!-- Multi-Run Overlap & Injection Alignment Card -->
+            <div class="card-sidebar" id="overlay-alignment-card">
+                <h4 class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span><i data-lucide="layers" style="width:13px; height:13px; vertical-align:middle; color:var(--accent);"></i> Wyatt &amp; Ã„KTA Multi-Run Alignment</span>
+                </h4>
+                <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.6rem;">
+                    Align Wyatt injections or additional runs with your continuous Ã„KTA timeline.
+                </p>
+
+                <!-- Injection selector from Ã„KTA Logbook -->
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label for="select-akta-injection" style="font-weight:600; color:var(--text-primary);">Target Ã„KTA Injection</label>
+                    <select id="select-akta-injection" class="input-control">
+                        <option value="0.0">Injection 1 (0.00 mL)</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="align-inj-vol" title="Volume on the primary timeline where this run started">Offset (mL)</label>
+                        <input type="number" id="align-inj-vol" class="input-control" value="0.0" step="0.1" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="align-tubing-delay" title="Capillary delay volume between UV and MALS cells">Delay (mL)</label>
+                        <input type="number" id="align-tubing-delay" class="input-control" value="0.15" step="0.05" min="0">
+                    </div>
+                </div>
+
+                <!-- Live Nudge & Auto-Align Buttons -->
+                <div style="display: flex; gap: 0.4rem; margin-top: 0.25rem;">
+                    <button id="nudge-left-btn" class="btn btn-secondary" style="flex:1; font-size:0.75rem; padding:0.35rem 0.2rem;" title="Shift Wyatt run 0.2 mL to the left">
+                        <i data-lucide="chevron-left" style="width:13px; height:13px;"></i> -0.2 mL
+                    </button>
+                    <button id="auto-align-peak-btn" class="btn btn-secondary" style="flex:1.4; font-size:0.75rem; padding:0.35rem 0.2rem;" title="Automatically align Wyatt peak to the nearest Ã„KTA UV peak">
+                        <i data-lucide="target" style="width:13px; height:13px;"></i> Auto-Align
+                    </button>
+                    <button id="nudge-right-btn" class="btn btn-secondary" style="flex:1; font-size:0.75rem; padding:0.35rem 0.2rem;" title="Shift Wyatt run 0.2 mL to the right">
+                        +0.2 mL <i data-lucide="chevron-right" style="width:13px; height:13px;"></i>
+                    </button>
+                </div>
+
+                <div class="form-group" style="margin-top:0.6rem; margin-bottom:0;">
+                    <label for="overlay-wyatt-input" class="btn btn-primary" style="width:100%; font-size:0.75rem; padding:0.45rem 0.6rem; cursor:pointer;">
+                        <i data-lucide="plus"></i> Add Wyatt Run (.afe7)
+                    </label>
+                    <input type="file" id="overlay-wyatt-input" class="file-input" accept=".afe7,.afs7,.csv">
+                </div>
+            </div>
+
+            <!-- Curves & Detectors Card -->
+            <div class="card-sidebar">
+                <h4 class="section-title">Curves &amp; Detectors</h4>
+                <div id="curves-controls-container" class="color-picker-group" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <span style="font-size:0.75rem; color:var(--text-muted); font-style:italic;">No data loaded.</span>
+                </div>
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.5rem 0;">
+                
+                <!-- Monochromatic LS Detectors Mode -->
+                <div class="switch-control">
+                    <span>Monochromatic LS Detectors</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-mono-ls">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="mono-ls-color-container" class="color-picker-item" style="display:none; margin-top: 0.25rem; margin-bottom: 0.5rem;">
+                    <span style="font-size:0.8rem; color:var(--text-secondary);">LS Detector Base Hue</span>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="color-mono-ls" value="#6366f1">
+                        <span class="color-value" id="val-mono-ls">#6366F1</span>
+                    </div>
+                </div>
+
+                <div class="switch-control">
+                    <span>Scale LS Background Height</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-ls-scaling" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="ls-scale-slider-container" style="margin-top: 0.25rem; margin-bottom: 0.6rem; padding: 0.5rem; background: var(--bg-hover); border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 0.3rem;">
+                        <span style="color: var(--text-secondary); font-weight: 500;">LS Graph Height:</span>
+                        <span id="ls-height-val" style="font-weight: 700; color: #a855f7;">50%</span>
+                    </div>
+                    <input type="range" id="ls-height-slider" min="10" max="100" value="50" step="5" style="width: 100%; accent-color: #a855f7; cursor: pointer;">
+                </div>
+                <div class="switch-control">
+                    <span>Compact Chart Legend</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-compact-legend" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-control">
+                    <span>Show Fraction Bands</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-fractions" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-control">
+                    <span>Performance Decimation</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-decimation" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-control">
+                    <span title="Scale chromatographic curves so baseline is 0% and apex is 100%">Normalize Curves (0 - 100%)</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-curve-normalization">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <button id="detectors-guide-btn" class="btn btn-secondary" style="font-size:0.75rem; width:100%; margin-top:0.4rem; padding:0.4rem 0.5rem;">
+                    <i data-lucide="help-circle" style="width:13px; height:13px; vertical-align:middle;"></i> Detectors & Channels Guide
+                </button>
+                <div class="color-picker-item" style="margin-top: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
+                    <span>Peak Highlight Fill</span>
+                    <div class="color-input-wrapper">
+                        <input type="color" id="color-peak" value="#6366f1">
+                        <span class="color-value" id="val-peak">#6366F1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEC-MALS & Complex Stoichiometry Card -->
+            <div class="card-sidebar" id="mals-sidebar-card">
+                <div class="card-title-badge-wrapper">
+                    <h4 class="section-title" style="margin-bottom:0;"><i data-lucide="calculator" style="width:14px; height:14px; vertical-align:middle; margin-right:4px; color:var(--accent);"></i> SEC-MALS &amp; Complex Analysis</h4>
+                </div>
+
+                <div class="switch-control">
+                    <span style="font-weight:600; color:var(--text-primary);">Molar Mass Overlay</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-molar-mass" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="switch-control">
+                    <span style="font-size:0.8rem; color:var(--text-secondary);" title="Suppress false pink MW points in baseline & wash steps">Gate MW to Peaks Only</span>
+                    <label class="switch">
+                        <input type="checkbox" id="sidebar-toggle-mw-peak-gating" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- 1-Click Auto-Fit MW in Sidebar -->
+                <button id="sidebar-auto-fit-btn" class="btn btn-primary" style="width: 100%; font-size:0.8rem; padding:0.5rem 0.75rem; margin-bottom: 0.5rem;" disabled>
+                    <i data-lucide="sparkles"></i> 1-Click Auto-Fit Standard MW
+                </button>
+
+                <!-- dn/dc Preset & Input -->
+                <div class="form-group">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label for="mals-preset">Sample Type (dn/dc Preset)</label>
+                        <button class="guide-trigger-btn" data-guide-tab="dndc" title="Learn about dn/dc values for proteins, nucleic acids, etc."><i data-lucide="help-circle"></i></button>
+                    </div>
+                    <select id="mals-preset" class="input-control">
+                        <option value="0.185">Protein (0.185 mL/g)</option>
+                        <option value="0.165">Glycoprotein (0.165 mL/g)</option>
+                        <option value="0.133">Nucleic Acid (0.133 mL/g)</option>
+                        <option value="0.140">Polysaccharide (0.140 mL/g)</option>
+                        <option value="custom">Custom dn/dc...</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="mals-dndc">dn/dc (mL/g)</label>
+                        <input type="number" id="mals-dndc" class="input-control" value="0.185" step="0.001" min="0.01" max="1.0">
+                    </div>
+                    <div class="form-group">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label for="mals-fit-model">Angular Fit Model</label>
+                            <button class="guide-trigger-btn" data-guide-tab="fit" title="Learn about Single Angle 90Â°, Zimm, Debye, Berry"><i data-lucide="help-circle"></i></button>
+                        </div>
+                        <select id="mals-fit-model" class="input-control">
+                            <option value="single" selected>Single Angle (90Â° - Cleanest for Proteins)</option>
+                            <option value="zimm">Zimm (Multi-Angle)</option>
+                            <option value="debye">Debye (Multi-Angle)</option>
+                            <option value="berry">Berry (Multi-Angle)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label for="mals-wavelength">Laser &lambda; (nm)</label>
+                            <button class="guide-trigger-btn" data-guide-tab="optics" title="Learn about Laser Wavelength and Solvent Index"><i data-lucide="help-circle"></i></button>
+                        </div>
+                        <input type="number" id="mals-wavelength" class="input-control" value="660.5" step="0.1" min="200" max="1200">
+                    </div>
+                    <div class="form-group">
+                        <label for="mals-n0">Solvent Index n<sub>0</sub></label>
+                        <input type="number" id="mals-n0" class="input-control" value="1.332" step="0.001" min="1.0" max="2.0">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label for="mals-baseline-start" title="Start volume of pure solvent baseline">Base Start (mL)</label>
+                            <button class="guide-trigger-btn" data-guide-tab="baseline" title="Learn about baseline tare windows"><i data-lucide="help-circle"></i></button>
+                        </div>
+                        <input type="number" id="mals-baseline-start" class="input-control" value="0.5" step="0.5" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="mals-baseline-end" title="End volume of pure solvent baseline">Base End (mL)</label>
+                        <input type="number" id="mals-baseline-end" class="input-control" value="2.5" step="0.5" min="0">
+                    </div>
+                </div>
+
+                <!-- Theoretical Subunit Masses for Stoichiometry Prediction -->
+                <div class="subunit-masses-group">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                        <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted);">
+                            Theoretical Subunit Masses (kDa)
+                        </span>
+                        <button class="guide-trigger-btn" data-guide-tab="stoich" title="Learn how complex stoichiometry is predicted"><i data-lucide="help-circle"></i></button>
+                    </div>
+                    <div class="form-row" style="margin-bottom:0.5rem;">
+                        <div class="form-group">
+                            <label for="subunit-a-mw" style="color:#38bdf8;">Subunit A (kDa)</label>
+                            <input type="number" id="subunit-a-mw" class="input-control" placeholder="e.g. 48.0 (MET2TAI)" step="0.1" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="subunit-b-mw" style="color:#fb7185;">Subunit B (kDa)</label>
+                            <input type="number" id="subunit-b-mw" class="input-control" placeholder="e.g. 24.0" step="0.1" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="subunit-tag-mw" style="color:#a78bfa;">Tag / Modifier (kDa)</label>
+                        <input type="number" id="subunit-tag-mw" class="input-control" placeholder="e.g. 12.0 (SUMO tag)" step="0.1" min="0">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Peak Integration Card -->
+            <div class="card-sidebar">
+                <h4 class="section-title">Peak Integration</h4>
+                
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                    <label for="target-curve">Integration Target</label>
+                    <select id="target-curve" class="input-control">
+                        <!-- Dynamically populated -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="baseline-mode">Baseline Correction</label>
+                    <select id="baseline-mode" class="input-control">
+                        <option value="linear">Linear Baseline (Start to End)</option>
+                        <option value="zero">Zero Baseline (Y = 0)</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="peak-start">Start (mL)</label>
+                        <input type="number" id="peak-start" class="input-control" placeholder="e.g. 12.5" step="0.1" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="peak-end">End (mL)</label>
+                        <input type="number" id="peak-end" class="input-control" placeholder="e.g. 16.2" step="0.1" min="0">
+                    </div>
+                </div>
+                
+                <button id="add-peak-btn" class="btn btn-primary" style="margin-top: 0.5rem;" disabled>
+                    <i data-lucide="plus-circle"></i> Integrate Selected Peak
+                </button>
+            </div>
+
+            <!-- SEC Column Calibration Card -->
+            <div class="card-sidebar" id="card-column-calibration">
+                <div class="card-title-badge-wrapper">
+                    <h4 class="section-title" style="margin-bottom:0;">
+                        <i data-lucide="compass" style="color:var(--accent); width:14px; height:14px; vertical-align:middle;"></i> SEC Column Calibration
+                    </h4>
+                    <span id="sec-cal-status-badge" class="badge-peak" style="font-size:0.65rem; border-left:3px solid #94a3b8;">Inactive</span>
+                </div>
+                <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem; margin-bottom:0.5rem;">
+                    Estimate Apparent SEC Molar Mass from standard retention curve (log Mw vs. Ve) to compare with MALS absolute mass.
+                </p>
+                
+                <div class="switch-control" style="margin-bottom:0.5rem;">
+                    <span style="font-weight:600; color:var(--text-primary);">Enable Column Calibration</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-column-calibration">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div id="column-calibration-controls" style="display:none; flex-direction:column; gap:0.5rem;">
+                    <div class="form-group">
+                        <label for="sec-column-preset">Column Standard Preset</label>
+                        <select id="sec-column-preset" class="input-control" style="font-size:0.75rem;">
+                            <option value="superdex200" selected>Cytiva Superdex 200 Increase 10/300 GL (10 - 600 kDa)</option>
+                            <option value="superose6">Cytiva Superose 6 Increase 10/300 GL (5 - 5000 kDa)</option>
+                            <option value="superdex75">Cytiva Superdex 75 Increase 10/300 GL (3 - 70 kDa)</option>
+                            <option value="tsk4000">Tosoh TSKgel G4000SWxl (20 - 7000 kDa)</option>
+                            <option value="tsk6000">Tosoh TSKgel G6000PWxl (40 - 8000+ kDa)</option>
+                            <option value="custom">Custom Standards (User Input)</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span id="sec-cal-formula" style="font-size:0.72rem; font-family:monospace; color:var(--accent); font-weight:700;">log(Mw) = -0.152Â·Ve + 4.21 (RÂ²=0.995)</span>
+                    </div>
+                    <button id="open-column-cal-modal-btn" class="btn btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.5rem; width:100%;">
+                        <i data-lucide="sliders" style="width:13px; height:13px;"></i> Configure Standards &amp; Curves
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Display Content -->
+        <section class="main-content" id="main-content-section">
+            
+            <!-- Welcome View (Shown initially) -->
+            <div class="welcome-overlay" id="welcome-view">
+                <div class="welcome-illustration">
+                    <i data-lucide="bar-chart-2" style="width: 64px; height: 64px;"></i>
+                </div>
+                <h2>Visualize Ã„KTA &amp; Wyatt SEC-MALS Runs</h2>
+                <p>Upload your Ã„KTA UNICORN CSV file or Wyatt ASTRA <strong>.afe7 / .afs7 / Multi-Section CSV</strong> database individually, or overlay them to compare absolute molar masses ($M_w, M_n$) and complex stoichiometries.</p>
+                <div style="display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; max-width:650px; margin: 0 auto;">
+                    <div style="flex:1; min-width:240px; font-size: 0.8rem; color: var(--text-muted); background: var(--bg-primary); padding: 1rem 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); text-align: left;">
+                        <strong style="color:var(--text-primary);"><i data-lucide="file-spreadsheet" style="width:14px; height:14px; vertical-align:middle; color:var(--accent);"></i> Ã„KTA UNICORN CSV:</strong>
+                        <div style="margin-top: 0.35rem;">Multi-wavelength UV (280, 254 nm), Conductivity, Buffer %B, and automatic Fraction swap ribbons.</div>
+                    </div>
+                    <div style="flex:1; min-width:240px; font-size: 0.8rem; color: var(--text-muted); background: var(--bg-primary); padding: 1rem 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); text-align: left;">
+                        <strong style="color:var(--text-primary);"><i data-lucide="activity" style="width:14px; height:14px; vertical-align:middle; color:#e879f9;"></i> Wyatt ASTRA (.afe7/.afs7/CSV):</strong>
+                        <div style="margin-top: 0.35rem;">Multi-section &amp; wide-table parsing, multi-angle light scattering extrapolation, and real-time complex stoichiometry.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Workspace (Hidden initially) -->
+            <div class="chart-container-wrapper" id="analysis-workspace" style="display: none;">
+                <div class="chart-header">
+                    <div class="chart-title-group">
+                        <h3 id="loaded-file-name">Chromatogram / SEC-MALS Run</h3>
+                        <p id="loaded-file-info">Total points loaded: 0</p>
+                    </div>
+                    <div class="chart-actions">
+                        <div class="btn-group" id="chart-interaction-mode-group" style="display:inline-flex; background:var(--bg-primary); border-radius:var(--radius-md); padding:2px; border:1px solid var(--border-color);">
+                            <button id="chart-mode-zoom-btn" class="btn btn-secondary active" style="font-size:0.75rem; padding:0.3rem 0.6rem; border:none; background:var(--accent); color:#fff;" title="Drag to Select Region &amp; Zoom In (Double-click to reset)">
+                                <i data-lucide="zoom-in" style="width:13px; height:13px;"></i> Box Zoom
+                            </button>
+                            <button id="chart-mode-peak-btn" class="btn btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.6rem; border:none; background:transparent; color:var(--text-secondary);" title="Click chart twice to select peak boundaries">
+                                <i data-lucide="map-pin" style="width:13px; height:13px;"></i> Select Peak
+                            </button>
+                        </div>
+                        <button id="chart-auto-fit-btn" class="btn btn-primary" style="font-size:0.75rem; padding:0.35rem 0.65rem;" title="1-Click Auto-Fit Standard Molecular Weight">
+                            <i data-lucide="sparkles" style="width:13px; height:13px;"></i> Auto-Fit MW
+                        </button>
+                        <button id="chart-reset-zoom-btn" class="btn btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.65rem;" title="Reset Chart Zoom" disabled>
+                            <i data-lucide="maximize" style="width:13px; height:13px;"></i> Reset Zoom
+                        </button>
+                        <button id="chart-plot-editor-btn" class="btn btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.65rem;" title="Customize Titles, Legend &amp; Fonts">
+                            <i data-lucide="sliders" style="width:13px; height:13px;"></i> Plot Editor
+                        </button>
+                        <button id="chart-export-btn" class="btn btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.65rem;" title="Export High-Resolution Publication Plot">
+                            <i data-lucide="download" style="width:13px; height:13px;"></i> Export Plot
+                        </button>
+                        <span id="click-instructions" style="font-size: 0.75rem; color: var(--text-muted); align-self: center; margin-left: 0.5rem;">
+                            <i data-lucide="zoom-in" style="width:12px; height:12px; vertical-align:middle;"></i> <strong>Drag mouse across chart</strong> to zoom into region &bull; <strong>Double-click</strong> to reset
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Chart Canvas Area -->
+                <div class="chart-canvas-area" id="chart-canvas-wrapper">
+                    <canvas id="chromatogram-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Peaks Table and Math Panel (Hidden initially) -->
+            <div class="analysis-container" id="peaks-container" style="display: none;">
+                <div class="analysis-card">
+                    <div class="card-header-with-actions">
+                        <h3><i data-lucide="calculator" style="color:var(--accent);"></i> Integrated Peaks, SEC-MALS &amp; Stoichiometry</h3>
+                        <div style="display:flex; gap:0.5rem;">
+                            <button id="table-auto-fit-btn" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;">
+                                <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> 1-Click Auto-Fit MW
+                            </button>
+                            <button id="clear-peaks-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;">
+                                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Clear All
+                            </button>
+                            <button id="export-peaks-csv" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;">
+                                <i data-lucide="file-spreadsheet" style="width: 14px; height: 14px;"></i> Export Peaks CSV
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="data-table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Peak</th>
+                                    <th>Range (mL)</th>
+                                    <th>Apex (mL)</th>
+                                    <th>Height</th>
+                                    <th>AUC</th>
+                                    <th>Mw MALS (kDa)</th>
+                                    <th id="th-sec-mw" title="Apparent Molecular Weight calculated from SEC Column Calibration Curve">SEC Apparent (kDa)</th>
+                                    <th id="th-sec-ratio" title="Apparent SEC Mw divided by MALS Absolute Mw (Conformation / Dispersity Indicator)">Conformation (App/MALS)</th>
+                                    <th>Mn (kDa)</th>
+                                    <th>PDI (Mw/Mn)</th>
+                                    <th>Predicted Complex Stoichiometry</th>
+                                    <th style="width: 50px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="peaks-table-body">
+                                <tr id="no-peaks-row">
+                                    <td colspan="12" style="text-align: center; color: var(--text-muted); font-style: italic; padding: 2rem;">
+                                        No peaks integrated yet. Click on any peak in the chart to calculate its molecular weight!
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- VIEW 3: Live Figure & Plot Editor (Split Screen View) -->
+    <!-- ================================================================= -->
+    <div id="view-figure-editor" class="app-view" style="display:none;">
+        <div class="figure-editor-layout">
+            <!-- Left Split: Publication Controls Panel -->
+            <aside class="figure-editor-sidebar">
+                <div class="card-sidebar">
+                    <div class="card-title-badge-wrapper">
+                        <h4 class="section-title" style="margin-bottom:0;">
+                            <i data-lucide="palette" style="color:var(--accent); width:14px; height:14px; vertical-align:middle;"></i> Publication Figure Customizer
+                        </h4>
+                    </div>
+                    
+                    <!-- Section: Titles & Typography -->
+                    <div class="editor-section">
+                        <span class="editor-section-heading"><i data-lucide="type"></i> Titles &amp; Text</span>
+                        
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label for="v3-plot-title">Figure Title</label>
+                            <input type="text" id="v3-plot-title" class="input-control" placeholder="e.g. Size-Exclusion SEC-MALS Chromatogram">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                            <label for="v3-plot-subtitle">Subtitle / Running Conditions</label>
+                            <input type="text" id="v3-plot-subtitle" class="input-control" placeholder="e.g. Superdex 200 Increase 10/300 GL &bull; 0.5 mL/min">
+                        </div>
+
+                        <div class="form-row" style="margin-bottom:0.5rem;">
+                            <div class="form-group">
+                                <label for="v3-plot-xaxis">X-Axis Label</label>
+                                <input type="text" id="v3-plot-xaxis" class="input-control" value="Elution Volume (mL)">
+                            </div>
+                            <div class="form-group">
+                                <label for="v3-plot-yprimary">Primary Y-Axis Label</label>
+                                <input type="text" id="v3-plot-yprimary" class="input-control" placeholder="Absorbance (mAU)">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="v3-plot-ysecondary">Secondary Y-Axis</label>
+                                <input type="text" id="v3-plot-ysecondary" class="input-control" value="Secondary Curves (%B / Cond)">
+                            </div>
+                            <div class="form-group">
+                                <label for="v3-plot-ymolarmass">Molar Mass Y-Axis</label>
+                                <input type="text" id="v3-plot-ymolarmass" class="input-control" value="Molar Mass (kDa)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: Y-Axis Smart Dynamic Clamping -->
+                    <div class="editor-section">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                            <span class="editor-section-heading" style="margin-bottom:0;"><i data-lucide="maximize-2"></i> Smart Y-Axis Dynamic Clamping</span>
+                        </div>
+                        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">
+                            Prevent late washing spikes or 100% buffer B transients from compressing real protein peaks into unreadable flat lines.
+                        </p>
+
+                        <div class="switch-control" style="margin-bottom:0.4rem;">
+                            <span style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">Peak-Aware Auto-Scaling (15% headroom)</span>
+                            <label class="switch">
+                                <input type="checkbox" id="plot-y-primary-autoscale" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="form-row" style="margin-bottom:0.4rem;">
+                            <div class="form-group">
+                                <label for="plot-y-primary-min">Primary Y Min</label>
+                                <input type="number" id="plot-y-primary-min" class="input-control" placeholder="Auto" step="5">
+                            </div>
+                            <div class="form-group">
+                                <label for="plot-y-primary-max">Primary Y Max</label>
+                                <input type="number" id="plot-y-primary-max" class="input-control" placeholder="Auto" step="10">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="plot-y-secondary-min">Secondary Y Min</label>
+                                <input type="number" id="plot-y-secondary-min" class="input-control" placeholder="Auto" step="5">
+                            </div>
+                            <div class="form-group">
+                                <label for="plot-y-secondary-max">Secondary Y Max</label>
+                                <input type="number" id="plot-y-secondary-max" class="input-control" placeholder="Auto" step="10">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: Typography & Fonts -->
+                    <div class="editor-section">
+                        <span class="editor-section-heading"><i data-lucide="feather"></i> Typography &amp; Styling</span>
+                        <div class="form-row" style="margin-bottom:0.5rem;">
+                            <div class="form-group">
+                                <label for="v3-plot-font-family">Font Family</label>
+                                <select id="v3-plot-font-family" class="input-control">
+                                    <option value="Plus Jakarta Sans" selected>Plus Jakarta Sans (Modern Sans)</option>
+                                    <option value="Inter">Inter (Clean Publication)</option>
+                                    <option value="Arial">Arial (Standard)</option>
+                                    <option value="Helvetica">Helvetica (Classic)</option>
+                                    <option value="Times New Roman">Times New Roman (Serif Journal)</option>
+                                    <option value="Georgia">Georgia (Serif Journal)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="v3-plot-font-weight">Title Weight</label>
+                                <select id="v3-plot-font-weight" class="input-control">
+                                    <option value="400">Regular (400)</option>
+                                    <option value="500">Medium (500)</option>
+                                    <option value="600" selected>Semi-Bold (600)</option>
+                                    <option value="700">Bold (700)</option>
+                                    <option value="800">Extra-Bold (800)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
+                            <div class="form-group">
+                                <label for="v3-plot-title-size">Title (px)</label>
+                                <input type="number" id="v3-plot-title-size" class="input-control" value="16" min="10" max="36">
+                            </div>
+                            <div class="form-group">
+                                <label for="v3-plot-axis-size">Axis (px)</label>
+                                <input type="number" id="v3-plot-axis-size" class="input-control" value="12" min="8" max="24">
+                            </div>
+                            <div class="form-group">
+                                <label for="v3-plot-ticks-size">Ticks (px)</label>
+                                <input type="number" id="v3-plot-ticks-size" class="input-control" value="11" min="8" max="20">
+                            </div>
+                            <div class="form-group">
+                                <label for="v3-plot-legend-size">Legend</label>
+                                <input type="number" id="v3-plot-legend-size" class="input-control" value="12" min="8" max="20">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: Curves & Aliases Table -->
+                    <div class="editor-section">
+                        <span class="editor-section-heading"><i data-lucide="tag"></i> Publication Curve Aliases</span>
+                        <div class="data-table-wrapper" style="max-height: 180px; overflow-y: auto;">
+                            <table class="data-table" id="editor-aliases-table-v3" style="font-size:0.75rem;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 32px;">Vis</th>
+                                        <th style="width: 38px;">Color</th>
+                                        <th>Channel</th>
+                                        <th>Publication Alias</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="editor-aliases-table-body-v3">
+                                    <tr>
+                                        <td colspan="4" style="text-align:center; color:var(--text-muted); padding:1rem;">Load dataset to configure curve aliases.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Section: Legend & Aspect Ratio Presets -->
+                    <div class="editor-section">
+                        <span class="editor-section-heading"><i data-lucide="layout"></i> Legend &amp; Aspect Ratio</span>
+                        <div class="form-row" style="margin-bottom:0.5rem;">
+                            <div class="form-group">
+                                <label for="v3-plot-legend-pos">Legend Position</label>
+                                <select id="v3-plot-legend-pos" class="input-control">
+                                    <option value="top" selected>Top</option>
+                                    <option value="bottom">Bottom</option>
+                                    <option value="left">Left</option>
+                                    <option value="right">Right</option>
+                                    <option value="hidden">Hidden / None</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="v3-plot-aspect-preset">Aspect Ratio Preset</label>
+                                <select id="v3-plot-aspect-preset" class="input-control">
+                                    <option value="responsive" selected>Responsive Full Width</option>
+                                    <option value="16:9">16:9 Widescreen (Presentation)</option>
+                                    <option value="4:3">4:3 Standard (Journal Figure)</option>
+                                    <option value="1:1">1:1 Square (Column Insert)</option>
+                                    <option value="custom">Custom Dimensions...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="switch-control" style="margin-bottom:0.5rem;">
+                            <span style="font-weight:600; color:var(--text-primary);">Normalize Curves (0 - 100% Apex)</span>
+                            <label class="switch">
+                                <input type="checkbox" id="v3-toggle-curve-normalization">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="form-row" id="v3-custom-dims-row" style="display:none; margin-bottom:0.5rem;">
+                            <div class="form-group">
+                                <label for="v3-plot-custom-w">Width (px)</label>
+                                <input type="number" id="v3-plot-custom-w" class="input-control" value="900" min="300" max="2500" step="50">
+                            </div>
+                            <div class="form-group">
+                                <label for="v3-plot-custom-h">Height (px)</label>
+                                <input type="number" id="v3-plot-custom-h" class="input-control" value="500" min="200" max="2000" step="50">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: High-DPI Publication Export -->
+                    <div class="editor-section">
+                        <span class="editor-section-heading"><i data-lucide="download"></i> High-DPI Journal Export</span>
+                        
+                        <div class="form-row" style="margin-bottom:0.5rem;">
+                            <div class="form-group">
+                                <label for="v3-plot-export-dpi">Resolution</label>
+                                <select id="v3-plot-export-dpi" class="input-control">
+                                    <option value="300" selected>300 DPI (Nature / Science Standard)</option>
+                                    <option value="600">600 DPI (Ultra-Sharp Archival Line Art)</option>
+                                    <option value="96">96 DPI (Standard Screen / Web)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="v3-plot-export-format">File Format</label>
+                                <select id="v3-plot-export-format" class="input-control">
+                                    <option value="png" selected>PNG (Lossless Raster)</option>
+                                    <option value="svg">SVG (Scalable Vector Graphic)</option>
+                                    <option value="pdf">PDF (Print Document)</option>
+                                    <option value="jpeg">JPEG (Solid Background)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom:0.75rem;">
+                            <label for="v3-plot-export-bg">Background Style</label>
+                            <select id="v3-plot-export-bg" class="input-control">
+                                <option value="publication" selected>Publication Mode (#FFFFFF Solid White)</option>
+                                <option value="transparent">Transparent Background</option>
+                                <option value="theme">Current Screen Theme</option>
+                            </select>
+                        </div>
+
+                        <button id="v3-export-download-btn" class="btn btn-primary" style="width:100%; padding:0.65rem 1rem; font-size:0.9rem;">
+                            <i data-lucide="download"></i> Generate &amp; Download Publication Graphic
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Right Split: Live Responsive Chart Preview Canvas -->
+            <section class="figure-editor-preview-panel">
+                <div class="chart-container-wrapper" style="height:100%; min-height:550px; display:flex; flex-direction:column;">
+                    <div class="chart-header">
+                        <div class="chart-title-group">
+                            <h3><i data-lucide="palette" style="color:var(--accent); vertical-align:middle;"></i> Live 60fps Responsive Preview</h3>
+                            <p id="v3-preview-info">Instant live updates as titles, typography, Y-axis clamps, and colors are edited.</p>
+                        </div>
+                        <div class="chart-actions">
+                            <span class="badge-peak" id="v3-aspect-badge" style="border-left: 3px solid #38bdf8; background: var(--bg-primary);">
+                                Aspect: Responsive
+                            </span>
+                            <button id="v3-reset-zoom-btn" class="btn btn-secondary" style="font-size:0.75rem; padding:0.35rem 0.65rem;" title="Reset Zoom" disabled>
+                                <i data-lucide="maximize" style="width:13px; height:13px;"></i> Reset Zoom
+                            </button>
+                            <button id="v3-quick-export-btn" class="btn btn-primary" style="font-size:0.75rem; padding:0.35rem 0.65rem;" title="Quick Export 300 DPI PNG">
+                                <i data-lucide="download" style="width:13px; height:13px;"></i> Quick 300 DPI
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-canvas-area" id="v3-chart-canvas-wrapper" style="flex:1; width:100%; min-height:480px;">
+                        <canvas id="figure-editor-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    </div>
+
+    <!-- Interactive Graph / Plot Editor Modal -->
+    <div id="plot-editor-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 820px; width: 95%; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="sliders" style="color:var(--accent);"></i> Graph &amp; Plot Publication Editor
+                </h3>
+                <button id="close-plot-editor-modal" class="btn-table-action" style="color:var(--text-muted); cursor: pointer;"><i data-lucide="x"></i></button>
+            </div>
+            
+            <!-- Editor Tabs -->
+            <div class="modal-tabs">
+                <button class="modal-tab-btn active" data-tab="tab-editor-typography"><i data-lucide="type"></i> Titles &amp; Typography</button>
+                <button class="modal-tab-btn" data-tab="tab-editor-curves"><i data-lucide="palette"></i> Curves &amp; Aliases</button>
+                <button class="modal-tab-btn" data-tab="tab-editor-legend"><i data-lucide="layout"></i> Legend &amp; Geometry</button>
+                <button class="modal-tab-btn" data-tab="tab-editor-export"><i data-lucide="download"></i> High-DPI Export</button>
+            </div>
+
+            <div class="modal-body" style="padding-top: 1rem;">
+                <!-- Tab 1: Titles & Typography -->
+                <div class="modal-tab-content active" id="tab-editor-typography">
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label for="plot-title-input">Plot Title</label>
+                            <input type="text" id="plot-title-input" class="input-control" placeholder="e.g. Size-Exclusion SEC-MALS Chromatogram">
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-subtitle-input">Subtitle / Metadata Tag</label>
+                            <input type="text" id="plot-subtitle-input" class="input-control" placeholder="e.g. Superdex 200 Increase 10/300 GL &bull; 0.5 mL/min">
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label for="plot-xaxis-title">X-Axis Title</label>
+                            <input type="text" id="plot-xaxis-title" class="input-control" value="Elution Volume (mL)">
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-yprimary-title">Y-Axis Primary (Left) Title</label>
+                            <input type="text" id="plot-yprimary-title" class="input-control" placeholder="Absorbance (mAU) / Light Scattering (V)">
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label for="plot-ysecondary-title">Y-Axis Secondary (Right) Title</label>
+                            <input type="text" id="plot-ysecondary-title" class="input-control" value="Secondary Curves (%B / Cond)">
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-ymolarmass-title">Molar Mass Y-Axis Title</label>
+                            <input type="text" id="plot-ymolarmass-title" class="input-control" value="Molar Mass (kDa)">
+                        </div>
+                    </div>
+
+                    <hr style="border:0; border-top:1px solid var(--border-color); margin:1rem 0;">
+
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label for="plot-font-family">Typography Font Family</label>
+                            <select id="plot-font-family" class="input-control">
+                                <option value="Plus Jakarta Sans" selected>Plus Jakarta Sans (Modern Sans)</option>
+                                <option value="Inter">Inter (Clean Publication)</option>
+                                <option value="Arial">Arial (Standard)</option>
+                                <option value="Helvetica">Helvetica (Classic)</option>
+                                <option value="Times New Roman">Times New Roman (Serif Journal)</option>
+                                <option value="Georgia">Georgia (Serif Journal)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-font-weight">Title Font Weight</label>
+                            <select id="plot-font-weight" class="input-control">
+                                <option value="400">Regular (400)</option>
+                                <option value="500">Medium (500)</option>
+                                <option value="600" selected>Semi-Bold (600)</option>
+                                <option value="700">Bold (700)</option>
+                                <option value="800">Extra-Bold (800)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;">
+                        <div class="form-group">
+                            <label for="plot-title-size">Title Size (px)</label>
+                            <input type="number" id="plot-title-size" class="input-control" value="16" min="10" max="36">
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-axis-size">Axis Labels (px)</label>
+                            <input type="number" id="plot-axis-size" class="input-control" value="12" min="8" max="24">
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-ticks-size">Ticks Size (px)</label>
+                            <input type="number" id="plot-ticks-size" class="input-control" value="11" min="8" max="20">
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-legend-size">Legend Size (px)</label>
+                            <input type="number" id="plot-legend-size" class="input-control" value="12" min="8" max="20">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Curves & Aliases -->
+                <div class="modal-tab-content" id="tab-editor-curves">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
+                        Rename curves to clean publication aliases, customize individual trace colors, and toggle visibility.
+                    </p>
+                    <div class="data-table-wrapper" style="max-height: 350px; overflow-y: auto;">
+                        <table class="data-table" id="editor-aliases-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">Vis</th>
+                                    <th style="width: 50px;">Color</th>
+                                    <th>Original Data Channel</th>
+                                    <th>Publication Display Alias</th>
+                                </tr>
+                            </thead>
+                            <tbody id="editor-aliases-table-body">
+                                <tr>
+                                    <td colspan="4" style="text-align:center; color:var(--text-muted); padding:1.5rem;">Load a dataset to configure curve aliases.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Legend & Geometry -->
+                <div class="modal-tab-content" id="tab-editor-legend">
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label for="plot-legend-pos">Legend Position</label>
+                            <select id="plot-legend-pos" class="input-control">
+                                <option value="top" selected>Top</option>
+                                <option value="bottom">Bottom</option>
+                                <option value="left">Left</option>
+                                <option value="right">Right</option>
+                                <option value="hidden">Hidden / None</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-legend-align">Legend Alignment</label>
+                            <select id="plot-legend-align" class="input-control">
+                                <option value="center" selected>Center</option>
+                                <option value="start">Start (Left / Top)</option>
+                                <option value="end">End (Right / Bottom)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label for="plot-point-style">Legend Marker Style</label>
+                            <select id="plot-point-style" class="input-control">
+                                <option value="circle" selected>Circle (Default)</option>
+                                <option value="line">Line (Stroke only)</option>
+                                <option value="rectRounded">Rounded Rectangle</option>
+                                <option value="rect">Rectangle Box</option>
+                                <option value="triangle">Triangle</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-aspect-preset">Aspect Ratio &amp; Geometry</label>
+                            <select id="plot-aspect-preset" class="input-control">
+                                <option value="responsive" selected>Responsive / Full Width (Default)</option>
+                                <option value="16:9">16:9 Widescreen (Presentation)</option>
+                                <option value="4:3">4:3 Standard (Journal Figure)</option>
+                                <option value="1:1">1:1 Square (Column Insert)</option>
+                                <option value="custom">Custom Dimensions (W x H)...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row" id="custom-dims-row" style="display:none; margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label for="plot-custom-w">Custom Width (px)</label>
+                            <input type="number" id="plot-custom-w" class="input-control" value="900" min="300" max="2500" step="50">
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-custom-h">Custom Height (px)</label>
+                            <input type="number" id="plot-custom-h" class="input-control" value="500" min="200" max="2000" step="50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 4: High-DPI Publication Export -->
+                <div class="modal-tab-content" id="tab-editor-export">
+                    <div style="background:var(--bg-primary); padding:1rem; border-radius:var(--radius-md); border:1px solid var(--border-color); margin-bottom:1rem;">
+                        <strong style="color:var(--text-primary); font-size:0.9rem;"><i data-lucide="award" style="color:var(--accent); vertical-align:middle; width:16px; height:16px;"></i> Journal &amp; Publication Standard Export</strong>
+                        <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.35rem;">
+                            Export ultra-high resolution vector and raster graphics optimized for Nature, Science, Cell, and JBC publication standards (300 DPI / 600 DPI).
+                        </p>
+                    </div>
+
+                    <div class="form-row" style="margin-bottom: 0.75rem;">
+                        <div class="form-group">
+                            <label for="plot-export-dpi">Resolution (DPI)</label>
+                            <select id="plot-export-dpi" class="input-control">
+                                <option value="300" selected>300 DPI (High-Resolution Print standard)</option>
+                                <option value="600">600 DPI (Ultra-Sharp Archival / Line Art)</option>
+                                <option value="96">96 DPI (Standard Web / Screen)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="plot-export-format">Export File Format</label>
+                            <select id="plot-export-format" class="input-control">
+                                <option value="png" selected>PNG (Lossless Raster, Crisp Curves)</option>
+                                <option value="svg">SVG (Scalable Vector Graphic)</option>
+                                <option value="pdf">PDF (Print-Ready Document)</option>
+                                <option value="jpeg">JPEG (Solid Background)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="plot-export-bg">Background &amp; Palette Style</label>
+                        <select id="plot-export-bg" class="input-control">
+                            <option value="publication" selected>Publication Mode (Pure White #FFFFFF Background &amp; Dark Typography)</option>
+                            <option value="transparent">Transparent Background (Overlay ready)</option>
+                            <option value="theme">Current Screen Theme (Dark/Light Canvas)</option>
+                        </select>
+                    </div>
+
+                    <button id="plot-editor-download-btn" class="btn btn-primary" style="width: 100%; padding: 0.75rem 1rem; font-size: 0.95rem;">
+                        <i data-lucide="download"></i> Generate &amp; Download Publication Graphic
+                    </button>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center; margin-top:1.25rem; border-top:1px solid var(--border-color); padding-top:0.75rem;">
+                <button id="reset-plot-settings-btn" class="btn btn-secondary" style="font-size:0.75rem;">
+                    <i data-lucide="rotate-ccw"></i> Reset Defaults
+                </button>
+                <button id="close-plot-editor-btn" class="btn btn-primary">Apply &amp; Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Biophysical Reference Guide & Theory Modal -->
+    <div id="biophysical-guide-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 820px; width: 95%; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="book-open" style="color:var(--accent);"></i> SEC-MALS Biophysical Educational Reference
+                </h3>
+                <button id="close-biophysical-modal" class="btn-table-action" style="color:var(--text-muted); cursor: pointer;"><i data-lucide="x"></i></button>
+            </div>
+
+            <!-- Biophysical Tabs -->
+            <div class="modal-tabs">
+                <button class="modal-tab-btn active" data-tab="guide-tab-sec-vs-mals"><i data-lucide="layers"></i> SEC vs MALS vs SDS-PAGE</button>
+                <button class="modal-tab-btn" data-tab="guide-tab-dndc"><i data-lucide="droplet"></i> dn/dc Increment</button>
+                <button class="modal-tab-btn" data-tab="guide-tab-fit"><i data-lucide="trending-up"></i> Angular Fit Models</button>
+                <button class="modal-tab-btn" data-tab="guide-tab-optics"><i data-lucide="sun"></i> Optics &amp; Solvent</button>
+                <button class="modal-tab-btn" data-tab="guide-tab-stoich"><i data-lucide="git-merge"></i> Stoichiometry</button>
+                <button class="modal-tab-btn" data-tab="guide-tab-baseline"><i data-lucide="align-justify"></i> Baseline &amp; Tare</button>
+            </div>
+
+            <div class="modal-body" style="padding-top: 1rem; font-size: 0.875rem; line-height: 1.6; color: var(--text-secondary);">
+                <!-- Tab: SEC vs MALS vs SDS-PAGE (Prominent Diagnostic Reference) -->
+                <div class="modal-tab-content active" id="guide-tab-sec-vs-mals">
+                    <div style="background:var(--bg-primary); padding:1rem; border-radius:var(--radius-md); border-left:4px solid #6366f1; border:1px solid var(--border-color); margin-bottom:0.75rem;">
+                        <strong style="color:#6366f1; font-size:1rem;">Biophysical Diagnostic Reference: SEC vs. MALS vs. SDS-PAGE &amp; Aggregation</strong>
+                        <p style="margin-top:0.35rem;">
+                            Fundamental physical differences between hydrodynamic volume elution, first-principles light scattering, and denatured electrophoresis explain why apparent retention masses diverge from true molecular weights.
+                        </p>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                        <div style="background:var(--bg-primary); padding:0.85rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:#38bdf8; font-size:0.9rem;"><i data-lucide="activity" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> 1. SEC Column Calibration: Hydrodynamic Volume ($V_h$) &amp; Stokes Radius ($R_h$)</strong>
+                            <p style="font-size:0.8rem; margin-top:0.25rem;">
+                                SEC column calibration curves ($\log M_w$ vs $V_e/V_0$) assume all proteins are rigid, compact, spherical globules identical to calibration standards (e.g. BSA, Aldolase, Thyroglobulin).
+                            </p>
+                            <p style="font-size:0.8rem; margin-top:0.25rem;">
+                                Size-exclusion chromatography separates strictly by <strong>hydrodynamic volume ($V_h \propto R_h^3$)</strong>, not molecular mass. Elongated, rod-like, fibrous, or intrinsically disordered proteins (IDPs) occupy a hydrodynamic envelope far larger than a sphere of equal mass. Consequently, they elute prematurely, causing column calibration to <strong>overestimate molecular weight by 200% to 300%</strong>!
+                            </p>
+                            <div class="guidance-tip" style="margin-top:0.4rem; font-size:0.75rem;">
+                                <strong>Principle:</strong> Column retention volume reports effective molecular dimensions and conformational compaction, never absolute molar mass.
+                            </div>
+                        </div>
+
+                        <div style="background:var(--bg-primary); padding:0.85rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:#34d399; font-size:0.9rem;"><i data-lucide="sun" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> 2. MALS: First-Principles Absolute Molar Mass ($M_w \propto R(0)/c$)</strong>
+                            <p style="font-size:0.8rem; margin-top:0.25rem;">
+                                Multi-Angle Light Scattering quantifies excess Rayleigh ratio $R(0)$ extrapolated to zero angle alongside concentration $c(t)$ measured directly by refractive index (dRI) or UV absorbance:
+                            </p>
+                            <div class="math-equation" style="margin:0.4rem 0; font-size:0.85rem;">M_w = \frac{R(0)}{K^* \cdot c} \quad \text{where} \quad K^* = \frac{4\pi^2 n_0^2 (dn/dc)^2}{N_A \lambda_0^4}</div>
+                            <p style="font-size:0.8rem; margin-top:0.25rem;">
+                                Because MALS is derived directly from first-principles Rayleigh-Debye scattering theory, it is <strong>completely independent of molecular shape, elongation, conformation, or column retention volume</strong>. No calibration standards are required.
+                            </p>
+                            <div class="guidance-tip" style="margin-top:0.4rem; font-size:0.75rem; border-left-color:#34d399;">
+                                <strong>Golden Standard:</strong> Always trust MALS over column calibration! If a peak elutes at an apparent 180 kDa on SEC but MALS reports 60 kDa, the sample is an extended/flexible 60 kDa monomer/dimer, not a 180 kDa complex.
+                            </div>
+                        </div>
+
+                        <div style="background:var(--bg-primary); padding:0.85rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:#fb7185; font-size:0.9rem;"><i data-lucide="layers" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> 3. SDS-PAGE vs. Native SEC-MALS: Monomer vs. Quaternary Assembly</strong>
+                            <p style="font-size:0.8rem; margin-top:0.25rem;">
+                                <strong>SDS-PAGE:</strong> Heat, SDS detergent, and reducing agents (DTT/&beta;-ME) unfold polypeptide chains and disrupt non-covalent interfaces and disulfide linkages, yielding the <em>denatured monomer subunit mass</em>.
+                            </p>
+                            <p style="font-size:0.8rem; margin-top:0.25rem;">
+                                <strong>SEC-MALS:</strong> Evaluates macromolecular complexes in native, non-denaturing physiological solution, providing the true <em>intact quaternary assembly state</em>.
+                            </p>
+                            <div class="guidance-tip" style="margin-top:0.4rem; font-size:0.75rem; border-left-color:#fb7185;">
+                                <strong>Stoichiometry Example:</strong> A construct running as a single 30 kDa band on SDS-PAGE that yields $M_w = 90.5\text{ kDa}$ on SEC-MALS is definitively a native <strong>homotrimer ($3 \times 30\text{ kDa}$)</strong>.
+                            </div>
+                        </div>
+
+                        <div style="background:var(--bg-primary); padding:0.85rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:#e879f9; font-size:0.9rem;"><i data-lucide="shield-alert" style="width:14px; height:14px; vertical-align:middle; margin-right:4px;"></i> 4. Aggregate Diagnostics: Soluble Void ($V_0$) vs. Trapped Insoluble Particulates</strong>
+                            <p style="font-size:0.8rem; margin-top:0.25rem;">
+                                <strong>Soluble Aggregates (Void Volume $V_0$):</strong> High-MW soluble assemblies ($M_w > 1\text{â€“}5\text{ MDa}$) are larger than the matrix pore exclusion limit and elute at the column void volume ($V_0 \approx 7.5\text{â€“}8.0\text{ mL}$ for a 24 mL Superdex 200). Since Rayleigh scattering scales with $M_w$, even trace soluble aggregates ($< 0.5\%$) produce intense light scattering peaks.
+                            </p>
+                            <p style="font-size:0.8rem; margin-top:0.25rem;">
+                                <strong>Insoluble Aggregates:</strong> Sub-micron/micron particulates ($> 0.22\ \mu\text{m}$) cannot enter column channels and are retained by the 0.2 Î¼m pre-column guard filter or top column frit. They do not elute as chromatographic peaks, but rather cause gradual column backpressure elevation (MPa/psi). Centrifuge or filter (0.22 Î¼m) all samples prior to SEC-MALS.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: dn/dc -->
+                <div class="modal-tab-content" id="guide-tab-dndc">
+                    <div style="background:var(--bg-primary); padding:1rem; border-radius:var(--radius-md); border-left:4px solid #38bdf8; border:1px solid var(--border-color); margin-bottom:0.75rem;">
+                        <strong style="color:#38bdf8; font-size:1rem;">What is dn/dc (Refractive Index Increment)?</strong>
+                        <p style="margin-top:0.35rem;">
+                            $dn/dc$ is the rate at which a solution's refractive index changes as solute concentration increases ($mL/g$). In MALS, the optical constant $K^*$ contains $(dn/dc)^2$, while the differential refractive index concentration $c(t)$ is $\Delta n / (dn/dc)$. Therefore:
+                        </p>
+                        <div class="math-equation" style="margin:0.5rem 0;">M_w = \frac{R(0)}{K^* \cdot c} \propto \frac{1}{(dn/dc)}</div>
+                        <p style="font-size:0.8rem; color:var(--text-muted);">
+                            A 5% deviation in $dn/dc$ directly propagates into a ~5% error in absolute molar mass.
+                        </p>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                        <div style="background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:var(--text-primary); font-size:0.85rem;">Standard Globular Proteins: 0.185 mL/g</strong>
+                            <p style="font-size:0.775rem; color:var(--text-secondary); margin-top:0.25rem;">Universal standard for unmodified soluble proteins at &lambda; = 660 nm.</p>
+                        </div>
+                        <div style="background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:var(--text-primary); font-size:0.85rem;">Glycoproteins: 0.165 - 0.170 mL/g</strong>
+                            <p style="font-size:0.775rem; color:var(--text-secondary); margin-top:0.25rem;">Carbohydrate chains have lower $dn/dc \approx 0.135\text{ mL/g}$, reducing the overall protein conjugate average.</p>
+                        </div>
+                        <div style="background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:var(--text-primary); font-size:0.85rem;">Nucleic Acids (DNA/RNA): 0.133 mL/g</strong>
+                            <p style="font-size:0.775rem; color:var(--text-secondary); margin-top:0.25rem;">Dense phosphate backbone gives significantly lower refractive index increment.</p>
+                        </div>
+                        <div style="background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:var(--text-primary); font-size:0.85rem;">Polysaccharides: 0.140 mL/g</strong>
+                            <p style="font-size:0.775rem; color:var(--text-secondary); margin-top:0.25rem;">Dextrans, pullulans, and neutral sugars.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Angular Fit Models -->
+                <div class="modal-tab-content" id="guide-tab-fit">
+                    <div style="background:var(--bg-primary); padding:1rem; border-radius:var(--radius-md); border-left:4px solid #34d399; border:1px solid var(--border-color); margin-bottom:0.75rem;">
+                        <strong style="color:#34d399; font-size:1rem;">Angular Fit Models &amp; Rayleigh Scattering Extrapolation</strong>
+                        <p style="margin-top:0.35rem;">
+                            Multi-Angle Light Scattering measures excess Rayleigh ratio $R(\theta)$ at multiple photodiodes. To eliminate destructive intra-particle interference from large molecules, the signal is extrapolated to $\theta = 0^\circ$.
+                        </p>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:0.6rem;">
+                        <div style="background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:#38bdf8;">1. Single Angle (90Â°) &mdash; Recommended for Globular Proteins</strong>
+                            <p style="font-size:0.8rem; margin-top:0.2rem;">For particles smaller than $\sim 10\text{ nm}$ ($R_g < \lambda/20$, MW $< 1\text{ MDa}$), scattering is isotropic (identical in all directions). Single 90Â° angle provides the highest signal-to-noise ratio without extrapolation noise.</p>
+                        </div>
+                        <div style="background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:#34d399;">2. Zimm Model: $\frac{K^* c}{R(\theta)} = \frac{1}{M_w} \left(1 + \frac{16\pi^2 n_0^2 R_g^2}{3\lambda^2}\sin^2(\theta/2)\right)$</strong>
+                            <p style="font-size:0.8rem; margin-top:0.2rem;">The classical linear extrapolation. Best for medium-sized compact complexes ($R_g \sim 15 - 50\text{ nm}$).</p>
+                        </div>
+                        <div style="background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:#fbbf24;">3. Debye Model: $\frac{R(\theta)}{K^* c} = M_w P(\theta)$</strong>
+                            <p style="font-size:0.8rem; margin-top:0.2rem;">Ideal for random-coil polymers, intrinsically disordered proteins, and flexible polymers.</p>
+                        </div>
+                        <div style="background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:#e879f9;">4. Berry Model: $\sqrt{\frac{K^* c}{R(\theta)}} = \frac{1}{\sqrt{M_w}} \left(1 + \frac{8\pi^2 n_0^2 R_g^2}{3\lambda^2}\sin^2(\theta/2)\right)$</strong>
+                            <p style="font-size:0.8rem; margin-top:0.2rem;">Recommended for very large macromolecules, microgels, or branched polymers ($R_g > 50\text{ nm}$).</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Optics & Solvent -->
+                <div class="modal-tab-content" id="guide-tab-optics">
+                    <div style="background:var(--bg-primary); padding:1rem; border-radius:var(--radius-md); border-left:4px solid #a78bfa; border:1px solid var(--border-color); margin-bottom:0.75rem;">
+                        <strong style="color:#a78bfa; font-size:1rem;">Laser Wavelength (&lambda;) &amp; Solvent Refractive Index (nâ‚€)</strong>
+                        <p style="margin-top:0.35rem;">
+                            Light scattering intensity scales inversely with the 4th power of laser wavelength ($\propto 1/\lambda^4$).
+                        </p>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                        <div style="background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:var(--text-primary); font-size:0.85rem;">Wyatt DAWN / miniDAWN Laser: 660.5 nm</strong>
+                            <p style="font-size:0.775rem; color:var(--text-secondary); margin-top:0.25rem;">Standard GaAs diode laser (red, 660.5 or 658.0 nm). Immune to sample auto-fluorescence common at blue wavelengths.</p>
+                        </div>
+                        <div style="background:var(--bg-primary); padding:0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                            <strong style="color:var(--text-primary); font-size:0.85rem;">Aqueous Buffer Index: nâ‚€ = 1.332</strong>
+                            <p style="font-size:0.775rem; color:var(--text-secondary); margin-top:0.25rem;">Pure water &amp; standard PBS at 25Â°C. High salt (1M NaCl) increases nâ‚€ to 1.341; 10% glycerol increases nâ‚€ to 1.345.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Stoichiometry -->
+                <div class="modal-tab-content" id="guide-tab-stoich">
+                    <div style="background:var(--bg-primary); padding:1rem; border-radius:var(--radius-md); border-left:4px solid #fb7185; border:1px solid var(--border-color); margin-bottom:0.75rem;">
+                        <strong style="color:#fb7185; font-size:1rem;">Theoretical Subunit Masses &amp; Complex Stoichiometry Prediction</strong>
+                        <p style="margin-top:0.35rem;">
+                            When you enter theoretical monomer masses (e.g. Subunit A = 48 kDa, Subunit B = 24 kDa, Tag = 12 kDa), the engine solves an integer optimization problem:
+                        </p>
+                        <div class="math-equation" style="margin:0.5rem 0;">M_{\text{calc}} = n_A M_A + n_B M_B + n_{\text{tag}} M_{\text{tag}}</div>
+                        <p style="font-size:0.8rem; color:var(--text-muted);">
+                            The candidate with the minimal percentage error $|\Delta \%| = |M_w - M_{\text{calc}}| / M_{\text{calc}} \times 100$ is assigned with confidence classification (e.g. Homodimer 2x, Heterotetramer Aâ‚‚Bâ‚‚).
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Tab: Baseline & Tare -->
+                <div class="modal-tab-content" id="guide-tab-baseline">
+                    <div style="background:var(--bg-primary); padding:1rem; border-radius:var(--radius-md); border-left:4px solid #f59e0b; border:1px solid var(--border-color); margin-bottom:0.75rem;">
+                        <strong style="color:#f59e0b; font-size:1rem;">Baseline Correction &amp; Solvent Window Taring</strong>
+                        <p style="margin-top:0.35rem;">
+                            Accurate MALS analysis requires subtracting the dark current and solvent background scattering before the protein elutes.
+                        </p>
+                    </div>
+                    <ul style="padding-left:1.25rem; font-size:0.825rem; display:flex; flex-direction:column; gap:0.4rem;">
+                        <li><strong>Solvent Window (0.5 to 2.5 mL):</strong> A clean, pre-void volume region where only pure running buffer flows through the optical cells.</li>
+                        <li><strong>Linear Baseline:</strong> Draws a straight baseline connecting peak start and end points, compensating for gradual lamp drift or gradient rise.</li>
+                        <li><strong>Zero Baseline:</strong> Uses absolute Y = 0 as reference level.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="margin-top: 1.25rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; text-align: right;">
+                <button id="close-biophysical-btn" class="btn btn-primary">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legacy Guide Modal: Plain English Analogies -->
+    <div id="guide-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 680px; max-height: 85vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="book-open" style="color:var(--accent);"></i> How Light Scattering &amp; Molecular Weight Works</h3>
+                <button id="close-guide-modal" class="btn-table-action" style="color:var(--text-muted); cursor: pointer;"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body" style="font-size: 0.875rem; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+                <div style="background: var(--bg-primary); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <strong style="color: var(--text-primary); font-size: 0.95rem;">1. Why retention time on the Ã„KTA can deceive you</strong>
+                    <p style="margin-top: 0.35rem;">On the Ã„KTA column, small molecules get delayed inside bead pores while big complexes rush through. But floppy or elongated proteins take up extra space, so they elute early even if they are light! Light scattering measures <strong>pure physical weight</strong> regardless of shape.</p>
+                </div>
+                <div style="background: var(--bg-primary); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <strong style="color: var(--text-primary); font-size: 0.95rem;">2. The Flashlight Analogy (How MALS works)</strong>
+                    <p style="margin-top: 0.35rem;">Shining a laser through your protein is like pointing a flashlight into mist vs. dust motes. Small monomers scatter a little bit of light; large complexes or aggregates flash brightly and scatter massive amounts of light!</p>
+                </div>
+                <div style="background: var(--bg-primary); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <strong style="color: var(--text-primary); font-size: 0.95rem;">3. Why you need Concentration + Light Scattering</strong>
+                    <p style="margin-top: 0.35rem;"><code>Scattered Light = Concentration &times; Molecular Weight</code>. Dividing the Light Scattering signal by the Refractive Index (dRI) / UV concentration cancels out concentration, yielding the exact Molecular Weight ($M_w$ in kDa).</p>
+                </div>
+                <div style="background: var(--bg-primary); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <strong style="color: var(--text-primary); font-size: 0.95rem;">4. How Stoichiometry Predictor Works (Lego Bricks)</strong>
+                    <p style="margin-top: 0.35rem;">If your MET2TAI subunit is 48 kDa and SUMO tag is 12 kDa (total 60 kDa), an integrated peak with $M_w \approx 120\text{ kDa}$ matches <code>2 &times; 60 kDa</code> with 0% error &rarr; labeled automatically as <strong>Homodimer (2x)</strong>!</p>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 1.25rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; text-align: right;">
+                <button id="close-guide-btn" class="btn btn-primary">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detectors & Channels Reference Guide Modal -->
+    <div id="detectors-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 720px; max-height: 85vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="help-circle" style="color:var(--accent);"></i> Detectors &amp; Channels Reference Guide</h3>
+                <button id="close-detectors-modal" class="btn-table-action" style="color:var(--text-muted); cursor: pointer;"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body" style="font-size: 0.85rem; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.9rem; margin-top: 1rem;">
+                <div style="background: var(--bg-primary); padding: 0.85rem 1rem; border-radius: var(--radius-md); border-left: 3px solid #38bdf8; border: 1px solid var(--border-color);">
+                    <strong style="color: #38bdf8; font-size: 0.95rem;">ðŸ”µ UV 1_280 / UV 254 (Ã„KTA Absorbance)</strong>
+                    <p style="margin-top: 0.25rem;">Measures light absorption at 280 nm (Tryptophan/Tyrosine aromatic rings) or 254 nm (Nucleic acids). It is proportional only to protein concentration, completely immune to salt/buffer mismatch.</p>
+                </div>
+                <div style="background: var(--bg-primary); padding: 0.85rem 1rem; border-radius: var(--radius-md); border-left: 3px solid #34d399; border: 1px solid var(--border-color);">
+                    <strong style="color: #34d399; font-size: 0.95rem;">ðŸŸ¢ Light Scattering 90Â° (MALS Detector 5)</strong>
+                    <p style="margin-top: 0.25rem;">The primary 90Â° photodiode in the Wyatt DAWN HELEOS flow cell. It has the highest signal-to-noise ratio and cleanest laser scattering profile, proportional to <code>(Molecular Weight) &times; (Concentration)</code>.</p>
+                </div>
+                <div style="background: var(--bg-primary); padding: 0.85rem 1rem; border-radius: var(--radius-md); border-left: 3px solid #fbbf24; border: 1px solid var(--border-color);">
+                    <strong style="color: #fbbf24; font-size: 0.95rem;">ðŸŸ¡ Refractive Index dRI (Wyatt Optilab)</strong>
+                    <p style="margin-top: 0.25rem;">Measures differential refractive index ($\Delta n$). Provides absolute concentration $c(t) = \Delta n / (dn/dc)$. Sensitive to any buffer salt/glycerol difference, which causes a salt front or negative dip at the total column volume.</p>
+                </div>
+                <div style="background: var(--bg-primary); padding: 0.85rem 1rem; border-radius: var(--radius-md); border-left: 3px solid #a78bfa; border: 1px solid var(--border-color);">
+                    <strong style="color: #a78bfa; font-size: 0.95rem;">ðŸŸ£ Multi-Angle Channels: LS Det 1 to 8 (32Â° to 141Â°)</strong>
+                    <p style="margin-top: 0.25rem;">Photodiodes positioned at 8 distinct angles around the flow cell. Used under the hood by the Zimm/Debye extrapolation engine to calculate $R(\theta \to 0)$ and Particle Radius of Gyration ($R_g$). Automatically hidden from the main view to keep the chart clean.</p>
+                </div>
+                <div style="background: var(--bg-primary); padding: 0.85rem 1rem; border-radius: var(--radius-md); border-left: 3px solid #e879f9; border: 1px solid var(--border-color);">
+                    <strong style="color: #e879f9; font-size: 0.95rem;">ðŸŒ¸ Molar Mass Mw (kDa) Overlay (Pink Dots)</strong>
+                    <p style="margin-top: 0.25rem;">The absolute molar mass calculated slice-by-slice across the peak via $M_w(t) = R(0, t) / (K^* c(t))$. Plotted on the right-hand logarithmic Y-axis ($1\text{ to }10,000\text{ kDa}$).</p>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; text-align: right;">
+                <button id="close-detectors-btn" class="btn btn-primary">Close Guide</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEC Column Calibration Modal -->
+    <div id="column-cal-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 720px; max-height: 85vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="compass" style="color:var(--accent);"></i> SEC Column Molecular Weight Calibration</h3>
+                <button id="close-column-cal-modal" class="btn-table-action" style="color:var(--text-muted); cursor: pointer;"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+                <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
+                    SEC separates biomolecules by hydrodynamic volume ($V_h$). Column calibration fits a linear standard curve ($\log_{10} M_w = -m \cdot V_e + b$) to calculate the <strong>Apparent SEC Molecular Weight</strong> and compare it with the <strong>MALS Absolute Molecular Weight</strong>.
+                </p>
+
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label for="modal-sec-preset">Select Column Standard Preset</label>
+                        <select id="modal-sec-preset" class="input-control">
+                            <option value="superdex200" selected>Cytiva Superdex 200 Increase 10/300 GL (10 - 600 kDa)</option>
+                            <option value="superose6">Cytiva Superose 6 Increase 10/300 GL (5 - 5000 kDa)</option>
+                            <option value="superdex75">Cytiva Superdex 75 Increase 10/300 GL (3 - 70 kDa)</option>
+                            <option value="tsk4000">Tosoh TSKgel G4000SWxl (20 - 7000 kDa)</option>
+                            <option value="tsk6000">Tosoh TSKgel G6000PWxl (40 - 8000+ kDa)</option>
+                            <option value="custom">Custom Calibration Standards (User Defined)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="modal-sec-unit">Input Units</label>
+                        <select id="modal-sec-unit" class="input-control">
+                            <option value="ml" selected>Elution Volume (mL)</option>
+                            <option value="min">Retention Time (min)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="modal-sec-flowrate">Flow Rate (mL/min)</label>
+                        <input type="number" id="modal-sec-flowrate" class="input-control" value="0.50" step="0.05" min="0.01">
+                    </div>
+                </div>
+
+                <!-- Standards Table -->
+                <div class="data-table-wrapper" style="max-height: 220px; overflow-y: auto;">
+                    <table class="data-table" id="modal-standards-table" style="font-size: 0.78rem;">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px; text-align: center;">Active</th>
+                                <th>Protein Standard Name</th>
+                                <th>Mass Mw (kDa)</th>
+                                <th id="th-modal-std-vol">Elution (mL)</th>
+                                <th style="width: 50px; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-standards-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <button id="add-std-row-btn" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;">
+                        <i data-lucide="plus"></i> Add Standard Point
+                    </button>
+                    <div id="modal-regression-summary" style="font-size: 0.8rem; font-weight: 700; font-family: monospace; color: var(--accent);">
+                        log(Mw) = -0.152Â·Ve + 4.21 (RÂ² = 0.995)
+                    </div>
+                </div>
+
+                <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 1rem; font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">
+                    <strong style="color: var(--text-primary);"><i data-lucide="info" style="width:13px; height:13px; vertical-align:middle;"></i> Scientific Reviewer Note:</strong>
+                    When $M_{\text{app}} / M_{\text{MALS}} \approx 1.0$, the protein is a compact sphere. If $M_{\text{app}} / M_{\text{MALS}} > 1.3$, the protein is elongated, rod-like, or intrinsically disordered (larger Stokes radius than standard globular markers).
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <button id="cancel-column-cal-btn" class="btn btn-secondary">Cancel</button>
+                <button id="apply-column-cal-btn" class="btn btn-primary"><i data-lucide="check-circle"></i> Apply Calibration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Plot Modal -->
+    <div id="export-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="download" style="color:var(--accent);"></i> Export Plot</h3>
+                <button id="close-export-modal" class="btn-table-action" style="color:var(--text-muted); cursor: pointer;"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1.25rem;">
+                <div class="form-group">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">File Format</label>
+                    <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem; font-weight: 500;">
+                            <input type="radio" name="export-format" value="png" checked style="cursor: pointer;">
+                            <span>PNG (Lossless, transparent)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem; font-weight: 500;">
+                            <input type="radio" name="export-format" value="jpeg" style="cursor: pointer;">
+                            <span>JPEG (Solid background)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Background Style</label>
+                    <div style="display: flex; flex-direction: column; gap: 0.65rem; margin-top: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem; font-weight: 500;">
+                            <input type="radio" name="export-bg" value="publication" checked style="cursor: pointer;">
+                            <span>Publication Style (Force solid white background, dark text/gridlines)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem; font-weight: 500;">
+                            <input type="radio" name="export-bg" value="current" style="cursor: pointer;">
+                            <span>Current Screen Theme (Solid background matching active theme)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <button id="cancel-export-btn" class="btn btn-secondary">Cancel</button>
+                <button id="confirm-export-btn" class="btn btn-primary"><i data-lucide="download"></i> Download</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Messages -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="app.js"></script>
+    <script>
+        try {
+            if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+                lucide.createIcons();
+            }
+        } catch (e) {
+            console.warn('Lucide initialization error:', e);
+        }
+    </script>
+
+</body>
+</html>
