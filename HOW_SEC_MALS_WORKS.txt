@@ -1,0 +1,145 @@
+================================================================================
+           HOW SEC-MALS (LIGHT SCATTERING) WORKS: A PLAIN-ENGLISH GUIDE
+                     (With Everyday Analogies & Zero Jargon)
+================================================================================
+
+Hey! Here is a simple, step-by-step explanation of what the Wyatt and AKTA 
+instruments are actually doing, why both are needed, and how the program figures 
+out the exact weight (MW) and assembly (stoichiometry) of your protein complexes.
+
+--------------------------------------------------------------------------------
+1. THE PROBLEM WITH AKTA ALONE (Why column retention time can lie to you)
+--------------------------------------------------------------------------------
+When you run a Size Exclusion Chromatography (SEC) column on the AKTA, you are 
+passing your protein through a column packed with microscopic porous beads.
+- Small molecules get lost inside the porous mazes and elute late.
+- Large molecules cannot enter the pores, take the highway around them, and 
+  elute early.
+
+*THE ANALOGY:*
+Imagine a crowded hallway filled with side rooms. A tall person (big complex) 
+walks straight down the hallway without stopping and reaches the exit in 5 minutes. 
+A child (small monomer) stops to explore every side room and takes 20 minutes.
+
+*THE TRAP:*
+What if you have a skinny, floppy, elongated protein? Even though it has a low 
+weight, it acts like a spinning jump rope, so it can't fit into the beads and 
+elutes early. On standard AKTA UV calibration, you might think it's a 200 kDa 
+tetramer when it's actually just a 50 kDa floppy monomer!
+
+This is why you need Light Scattering (MALS). Light scattering measures the TRUE 
+mass regardless of protein shape.
+
+--------------------------------------------------------------------------------
+2. HOW LIGHT SCATTERING (MALS) MEASURES WEIGHT
+--------------------------------------------------------------------------------
+Inside the Wyatt DAWN HELEOS, a red laser beam shines directly through a tiny 
+glass flow cell while your protein flows through.
+
+*THE ANALOGY (The Flashlight & Fog):*
+Imagine standing in a dark room with a flashlight:
+1. If there is fine water mist in the air (small monomer molecules), the beam 
+   glows faintly.
+2. If large dust motes or bowling balls float into the beam (large protein 
+   complexes or aggregates), they flash brightly and scatter tons of light in 
+   all directions!
+
+The physical law of light scattering:
+   The intensity of scattered light is DIRECTLY PROPORTIONAL to:
+   [Number of molecules] x [Molecular Weight of each molecule]
+
+Notice that a heavy complex scatters VASTLY more light than a small monomer!
+
+--------------------------------------------------------------------------------
+3. WHY YOU NEED TWO DETECTORS (MALS + dRI or UV)
+--------------------------------------------------------------------------------
+Look at the rule above:
+   Scattered Light = (Concentration) x (Molecular Weight)
+
+If the light detector sees a bright flash, it has a dilemma:
+- "Is this a LOT of small 20 kDa monomers?" OR
+- "Is this a TINY AMOUNT of a huge 500 kDa complex?"
+
+To solve this equation for Molecular Weight, you need to divide by Concentration:
+   Molecular Weight = (Scattered Light) / (Concentration)
+
+Where do we get concentration?
+- From the Optilab Refractive Index (dRI) detector or the AKTA UV detector!
+  - dRI / UV measures: "How many grams of protein are here?" (Concentration c)
+  - MALS measures:     "How much total light is scattered?" (Rayleigh ratio R)
+
+When the program divides Light Scattering by Concentration slice by slice:
+   Mw(t) = R(t) / (K* x c(t))
+BAM! Concentration cancels out, and you are left with the pure, absolute 
+Molecular Weight in Daltons (or kDa).
+
+--------------------------------------------------------------------------------
+4. WHAT IS "BASELINE CORRECTION" AND WHY IS IT CRITICAL?
+--------------------------------------------------------------------------------
+*THE ANALOGY (Taring the Kitchen Scale):*
+Before you weigh flour, you put an empty bowl on the scale. The scale reads 
+150 grams (the bowl). If you don't hit the "TARE / ZERO" button, your flour will 
+read 150 grams too heavy!
+
+In SEC-MALS:
+- The buffer solution itself, the glass cell, and pure solvent scatter a little bit 
+  of light (the "bowl", e.g. 0.15 Volts).
+- When protein elutes, the voltage goes up to 5.0 Volts.
+- Baseline subtraction simply subtracts the 0.15 V solvent background so we 
+  are only measuring the EXCESS light scattered by your protein.
+
+--------------------------------------------------------------------------------
+5. WHAT IS ZIMM / DEBYE EXTRAPOLATION? (The Multiple Angles)
+--------------------------------------------------------------------------------
+Why does the Wyatt HELEOS have 8 or 18 detectors at different angles (32°, 44°, 
+57°, 72°, 90°, 108°, etc.) instead of just one?
+
+*THE ANALOGY:*
+When light hits a large molecule (larger than ~10-15 nm), light waves scattered 
+from the front of the molecule interfere with light waves scattered from the back.
+This makes the light dimmer at steep backward angles.
+
+The pure, true weight equation only works perfectly at Angle = 0° (straight ahead), 
+but you can't put a photodiode at 0° because the direct laser beam would blind it!
+
+So the Wyatt measures light at 8 different angles, plots them on a line, and 
+extrapolates backward to Angle = 0° (using the Zimm or Debye mathematical line). 
+The intercept at Angle = 0° gives the exact, interference-free Molecular Weight.
+
+--------------------------------------------------------------------------------
+6. HOW COMPLEX STOICHIOMETRY IS PREDICTED (The Lego Brick Analyzer)
+--------------------------------------------------------------------------------
+Once the program knows your peak has an average weight of, say, 120 kDa:
+
+*THE ANALOGY:*
+Suppose you know you mixed two types of Lego bricks:
+- Subunit A (MET2TAI) = 48 kDa
+- Tag (SUMO)          = 12 kDa
+- Total tagged monomer = 48 + 12 = 60 kDa
+
+The computer tests combinations:
+- 1 Monomer  = 60 kDa  (Error: 50% -> No)
+- 2 Monomers = 120 kDa (Error: 0.0% -> EXACT MATCH! -> "Homodimer (2x)")
+- 4 Monomers = 240 kDa (Error: 100% -> No)
+
+It automatically labels your peak as "Homodimer (2x)" with calculated residual error!
+
+--------------------------------------------------------------------------------
+7. WHY AKTA & WYATT RUNS HAVE DIFFERENT TIME/VOLUME FRAMES
+--------------------------------------------------------------------------------
+- The AKTA pump runs continuously for the whole day (0 to 120 mL).
+- The Wyatt software is started separately for each fraction injection 
+  (0 to 17.5 mL).
+- In reality, the Wyatt liquid is connected right after the AKTA UV detector via 
+  a small capillary tube.
+- By setting an Injection Offset (e.g. "Injection 2 happened at 35.0 mL on AKTA") 
+  plus a small 0.15 mL capillary delay, the program shifts the Wyatt run so that 
+  it overlaps 100% on top of the AKTA chromatogram!
+
+================================================================================
+SUMMARY CHEAT SHEET:
+1. AKTA UV / dRI   -> Tells you: "How much protein is here?"
+2. Wyatt MALS red  -> Tells you: "How heavy is each particle?"
+3. MALS / dRI      -> Yields: Absolute Molecular Weight (Mw in kDa)
+4. Peak Table      -> Tells you: Monomer, Dimer, Tetramer, or Higher Complex!
+================================================================================
